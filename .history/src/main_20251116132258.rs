@@ -104,7 +104,7 @@ version = "0.1.0"
 main = "Main"
 scala_version = "2.13"
 source_dir = "src/main/scala"
-target_dir = "build"
+target_dir = "target"
 
 [dependencies]
 "#,
@@ -131,7 +131,7 @@ target_dir = "build"
 async fn cmd_build(cwd: &PathBuf) -> anyhow::Result<()> {
     let project = Project::load(cwd)?;
     let deps = project.get_dependencies();
-    build::build_with_deps(cwd, &deps, &project.package.source_dir, &project.package.target_dir).await?;
+    build::build_with_deps(cwd, &deps, &project.package.source_dir).await?;
     println!("Build succeeded with {} dependencies", deps.len());
     Ok(())
 }

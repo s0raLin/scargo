@@ -7,7 +7,7 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
     let source_path = proj_dir.join(source_dir);
     let target_path = proj_dir.join(target_dir);
     let mut cmd = Command::new("scala-cli");
-    cmd.arg("compile").arg("-d").arg(&target_path).arg(&source_path).current_dir(proj_dir);
+    cmd.arg("compile").arg("--output").arg(&target_path).arg(&source_path).current_dir(proj_dir);
 
     for dep in deps {
         cmd.arg("--dependency").arg(dep.coord());
