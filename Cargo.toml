@@ -13,3 +13,9 @@ anyhow = "*"
 tokio = { version = "*", features = ["full"] }
 toml_edit = "0.22"
 reqwest = { version = "*", features = ["json"] }
+libloading = "0.8"
+semver = "1.0"
+sha2 = "0.10"
+libc = "0.2"
+notify = "6.1"
+lazy_static = "1.4"

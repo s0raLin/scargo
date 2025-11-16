@@ -10,6 +10,8 @@
 - 使用 `scargo build` 构建 Scala 项目
 - 使用 `scargo run` 运行 Scala 应用程序
 - 使用 `scargo add <dep>` 添加依赖
+- 使用 `scargo remove <dep>` 移除依赖
+- 使用 `scargo update [dep]` 更新依赖到最新版本
 - 通过 `Scargo.toml` 配置项目设置
 
 ## 快速开始
@@ -100,6 +102,20 @@ scargo add cats@2.13:2.10.0
 - `cats`：为项目 Scala 版本添加最新版本的 cats-core
 - `org.typelevel::cats-core_2.13:2.10.0`：完整规范，包括组、制品、Scala 版本和版本
 - `cats@2.13:2.10.0`：简短形式，包含 Scala 版本和版本
+
+### 移除依赖
+
+```bash
+scargo remove cats
+scargo remove org.typelevel::cats-core_2.13
+```
+
+### 更新依赖
+
+```bash
+scargo update          # 更新所有依赖到最新版本
+scargo update cats     # 更新指定的依赖
+```
 
 ## 配置
 

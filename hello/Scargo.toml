@@ -10,4 +10,5 @@ target_dir = "build"
 
 "org.typelevel::cats-core_2.13" = "2.13.0"
 
-"org.scalafx::scalafx_2.12" = "24.0.2-R36"
+"org.scalafx::scalafx_2.12" = "24.0.0-R35"
+"ch.qos.logback::logback-classic" = "1.5.18"

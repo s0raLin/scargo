@@ -33,6 +33,6 @@ pub async fn cmd_new(cwd: &PathBuf, name: &str) -> anyhow::Result<()> {
     )
     .await?;
 
-    println!("Created project `{}`", name);
+    println!("{}", crate::t!("project.created", &[name]));
     Ok(())
 }

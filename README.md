@@ -6,11 +6,17 @@ A Cargo-like build tool for Scala projects.
 
 ## Features
 
-- Project initialization with `scargo new <name>`
-- Building Scala projects with `scargo build`
-- Running Scala applications with `scargo run`
-- Adding dependencies with `scargo add <dep>`
-- Configurable project settings via `Scargo.toml`
+- 🚀 **Project initialization** with `scargo new <name>`
+- 🔨 **Building Scala projects** with `scargo build`
+- ▶️ **Running Scala applications** with `scargo run`
+- 📦 **Smart dependency management** with `scargo add <dep>`
+- 🧪 **Integrated testing** with `scargo test`
+- 🔥 **Hot reload development** with `scargo dev`
+- 🔌 **Plugin system** for extensibility
+- 💾 **Build caching** for faster builds
+- 📊 **Project information** with `scargo info`
+- 🧹 **Clean builds** with `scargo clean`
+- ⚙️ **Configurable project settings** via `Scargo.toml`
 
 ## Installation
 
@@ -90,16 +96,57 @@ scargo run --lib
 ### Add dependencies
 
 ```bash
-scargo add cats
-scargo add org.typelevel::cats-core_2.13:2.10.0
-scargo add cats@2.13:2.10.0
+scargo add cats                    # Latest stable version
+scargo add cats:latest            # Explicit latest version
+scargo add cats:stable            # Latest stable version
+scargo add cats:[2.0,3.0)         # Version range
+scargo add org.typelevel::cats-core_2.13:2.10.0  # Full specification
+scargo add cats@2.13:2.10.0       # Short form with Scala version
 ```
 
 Dependency format: `group::artifact[@scala-version][:version]`
 
-- `cats`: Adds the latest version of cats-core for the project's Scala version
-- `org.typelevel::cats-core_2.13:2.10.0`: Full specification with group, artifact, Scala version, and version
-- `cats@2.13:2.10.0`: Short form with Scala version and version
+- `cats`: Adds the latest stable version of cats-core for the project's Scala version
+- `cats:latest`: Explicit latest version (may include pre-releases)
+- `cats:stable`: Latest stable version (no pre-releases)
+- `cats:[2.0,3.0)`: Version range (2.0 ≤ version < 3.0)
+- Full specification with group, artifact, Scala version, and version
+
+### Run tests
+
+```bash
+scargo test              # Run all tests
+scargo test MyTest       # Run specific test
+```
+
+### Hot reload development
+
+```bash
+scargo dev               # Start hot reload mode
+```
+
+Automatically rebuilds and runs your application when source files change.
+
+### Plugin system
+
+```bash
+scargo plugin my-plugin command arg1 arg2  # Execute plugin command
+scargo plugins                             # List available plugins
+```
+
+Plugins are loaded from `~/.scargo/plugins/` directory.
+
+### Project information
+
+```bash
+scargo info               # Show project details
+```
+
+### Clean build artifacts
+
+```bash
+scargo clean              # Remove build artifacts
+```
 
 ## Configuration
 
