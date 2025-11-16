@@ -1,0 +1,8 @@
+[package]
+name = "demo"
+version = "0.1.0"
+
+[dependencies]
+"org.typelevel::cats-core_2.13" = "2.10.0"
+"com.lihaoyi::upickle_2.13"     = "3.1.4"
+"dev.zio::zio_2.13"             = "2.0.22"

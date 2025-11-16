@@ -1,0 +1,12 @@
+[package]
+name = "scargo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "*", features = ["derive"] }
+serde = { version = "*", features = ["derive"] }
+toml = "*"
+dirs = "*"
+anyhow = "*"
+tokio = { version = "*", features = ["full"]}

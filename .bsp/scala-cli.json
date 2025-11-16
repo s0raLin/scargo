@@ -1,0 +1,20 @@
+{
+  "name": "scala-cli",
+  "argv": [
+    "/home/cangli/.cache/scalacli/local-repo/bin/scala-cli/scala-cli",
+    "bsp",
+    "--json-options",
+    "/home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-options-v2.json",
+    "--json-launcher-options",
+    "/home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-launcher-options.json",
+    "--envs-file",
+    "/home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-envs.json",
+    "/home/cangli/Desktop/workspace/code/rust/scargo"
+  ],
+  "version": "1.9.1",
+  "bspVersion": "2.1.1",
+  "languages": [
+    "scala",
+    "java"
+  ]
+}

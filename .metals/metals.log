@@ -1,0 +1,75 @@
+2025.11.16 11:24:46 INFO  Started: Metals version 1.6.3 in folders '/home/cangli/Desktop/workspace/code/rust/scargo' for client Visual Studio Code 1.106.0.[0m
+2025.11.16 11:24:47 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.[0m
+2025.11.16 11:24:49 INFO  no build target found for /home/cangli/Desktop/workspace/code/rust/scargo/hello/src/main/scala/Main.scala. Using presentation compiler with project's scala-library version: 3.3.6[0m
+2025.11.16 11:24:49 INFO  Running List(/home/cangli/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, setup-ide, /home/cangli/Desktop/workspace/code/rust/scargo)[0m
+2025.11.16 11:24:49 INFO  Attempting to connect to the build server...[0m
+2025.11.16 11:24:49 INFO  Running BSP server List(/home/cangli/.cache/scalacli/local-repo/bin/scala-cli/scala-cli, bsp, --json-options, /home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-options-v2.json, --json-launcher-options, /home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-launcher-options.json, --envs-file, /home/cangli/Desktop/workspace/code/rust/scargo/.scala-build/ide-envs.json, /home/cangli/Desktop/workspace/code/rust/scargo)[0m
+2025.11.16 11:24:49 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at /home/cangli/Desktop/workspace/code/rust/scargo/.metals/bsp.trace.json or /home/cangli/.cache/metals/bsp.trace.json[0m
+2025.11.16 11:24:49 INFO  time: Connected to build server in 0.46s[0m
+2025.11.16 11:24:50 INFO  Connected to Build server: scala-cli v1.9.1[0m
+2025.11.16 11:24:49 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 11:24:51 INFO  time: compiled scargo_c69e7bccc1 in 1.15s[0m
+2025.11.16 11:24:52 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 11:24:52 INFO  time: indexed workspace in 2.57s[0m
+2025.11.16 11:28:11 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 11:28:11 INFO  time: compiled scargo_c69e7bccc1 in 0.39s[0m
+2025.11.16 11:28:13 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 11:28:13 INFO  time: indexed workspace in 1.52s[0m
+2025.11.16 11:28:13 WARN  no build target for: /home/cangli/Desktop/workspace/code/rust/scargo/hello/src/main/scala/Main.scala[0m
+2025.11.16 11:39:17 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 11:39:17 INFO  time: compiled scargo_c69e7bccc1 in 0.63s[0m
+2025.11.16 11:39:19 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 11:39:19 INFO  time: indexed workspace in 2.22s[0m
+2025.11.16 11:42:11 INFO  Skipping reload with status 'Installed'[0m
+2025.11.16 12:36:39 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 12:36:39 INFO  time: compiled scargo_c69e7bccc1 in 0.98s[0m
+2025.11.16 12:36:40 INFO  time: Imported build in 1.08s[0m
+2025.11.16 12:36:41 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 12:36:41 INFO  time: indexed workspace in 1.56s[0m
+2025.11.16 12:39:40 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 12:39:40 INFO  time: compiled scargo_c69e7bccc1 in 0.8s[0m
+2025.11.16 12:39:42 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 12:39:42 INFO  time: indexed workspace in 1.5s[0m
+11月 16, 2025 12:45:56 下午 org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleNotification
+警告: Notification threw an exception: {
+  "jsonrpc": "2.0",
+  "method": "metals/didFocusTextDocument",
+  "params": [
+    "class:/home/cangli/Desktop/workspace/code/rust/scargo/hello/src/main/scala/.scala-build/scala_5be0072656-88241d457f/classes/main/Main%24.class"
+  ]
+}
+java.nio.file.FileSystemNotFoundException: Provider "class" not installed
+	at java.base/java.nio.file.Path.of(Path.java:213)
+	at java.base/java.nio.file.Paths.get(Paths.java:98)
+	at scala.meta.internal.mtags.MtagsEnrichments$XtensionURIMtags.toAbsolutePath(MtagsEnrichments.scala:149)
+	at scala.meta.internal.mtags.MtagsEnrichments$XtensionStringMtags.toAbsolutePath(MtagsEnrichments.scala:209)
+	at scala.meta.internal.metals.MetalsEnrichments$XtensionString.toAbsolutePath(MetalsEnrichments.scala:796)
+	at scala.meta.internal.metals.MetalsEnrichments$XtensionString.toAbsolutePath(MetalsEnrichments.scala:793)
+	at scala.meta.internal.metals.WorkspaceLspService.didFocus(WorkspaceLspService.scala:786)
+	at scala.meta.metals.lsp.DelegatingScalaService.didFocus(DelegatingScalaService.scala:42)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint.lambda$recursiveFindRpcMethods$0(GenericEndpoint.java:65)
+	at org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint.notify(GenericEndpoint.java:160)
+	at org.eclipse.lsp4j.jsonrpc.RemoteEndpoint.handleNotification(RemoteEndpoint.java:231)
+	at org.eclipse.lsp4j.jsonrpc.RemoteEndpoint.consume(RemoteEndpoint.java:198)
+	at org.eclipse.lsp4j.jsonrpc.json.StreamMessageProducer.handleMessage(StreamMessageProducer.java:185)
+	at org.eclipse.lsp4j.jsonrpc.json.StreamMessageProducer.listen(StreamMessageProducer.java:97)
+	at org.eclipse.lsp4j.jsonrpc.json.ConcurrentMessageProcessor.run(ConcurrentMessageProcessor.java:114)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+2025.11.16 12:46:06 INFO  Cancelling compilation on scala-cli server[0m
+2025.11.16 12:46:06 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 12:46:06 INFO  time: compiled scargo_c69e7bccc1 in 0.62s[0m
+2025.11.16 12:46:07 INFO  time: Imported build in 0.65s[0m
+2025.11.16 12:46:09 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 12:46:09 INFO  time: indexed workspace in 1.76s[0m
+2025.11.16 12:46:09 WARN  no build target for: /home/cangli/Desktop/workspace/code/rust/scargo/hello/src/main/scala/Main.scala[0m
+2025.11.16 12:46:19 INFO  compiling scargo_c69e7bccc1 (1 scala source)[0m
+2025.11.16 12:46:19 INFO  time: compiled scargo_c69e7bccc1 in 0.28s[0m
+2025.11.16 12:46:20 WARN  Could not find java sources in /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip, /usr/lib/jvm/src.zip, /usr/lib/jvm/lib/src.zip, /usr/lib/jvm/java-21-openjdk/src.zip, /usr/lib/jvm/java-21-openjdk/lib/src.zip. Java symbols will not be available.[0m
+2025.11.16 12:46:20 INFO  time: indexed workspace in 1.29s[0m

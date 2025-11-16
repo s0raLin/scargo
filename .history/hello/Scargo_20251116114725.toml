@@ -1,0 +1,9 @@
+[package]
+name = "hello"
+version = "0.1.0"
+main = "Main"
+
+[dependencies]
+"org.typelevel::cats-core" = "2.10.0"
+"com.lihaoyi::upickle"     = "3.1.4"
+"dev.zio::zio"             = "2.0.22"
