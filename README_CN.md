@@ -2,6 +2,8 @@
 
 一个类似 Cargo 的 Scala 项目构建工具。
 
+📖 **文档**: [English](README.md) | [中文](README_CN.md)
+
 ## 功能特性
 
 - 使用 `scargo new <name>` 初始化项目
