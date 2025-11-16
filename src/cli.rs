@@ -12,8 +12,14 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    New { name: String },
+    #[command(about = "Create a new Scala project")]
+    New {
+        /// Name of the new project
+        name: String
+    },
+    #[command(about = "Build the Scala project")]
     Build,
+    #[command(about = "Run the Scala project or a specific file")]
     Run {
         /// Optional .scala file to run (relative to project root)
         #[arg(value_name = "FILE")]
@@ -23,9 +29,10 @@ pub enum Commands {
         #[arg(long)]
         lib: bool,
     },
+    #[command(about = "Add a dependency to the project")]
     Add {
         /// Dependency in format: group::artifact[@scala-version][:version]
         #[arg(value_name = "DEP")]
         dep: String,
-    }
+    },
 }
