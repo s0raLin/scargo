@@ -1,9 +1,0 @@
-[package]
-name = "hello"
-version = "0.1.0"
-main = "Main"
-
-[dependencies]
-
-"org.typelevel::hello_2.13" = 
-    "latest"
