@@ -104,7 +104,7 @@ version = "0.1.0"
 main = "Main"
 scala_version = "2.13"
 source_dir = "src/main/scala"
-target_dir = "build"
+target_dir = "target"
 
 [dependencies]
 "#,
