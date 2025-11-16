@@ -2,6 +2,8 @@
 
 A Cargo-like build tool for Scala projects.
 
+📖 **Documentation**: [English](README.md) | [中文](README_CN.md)
+
 ## Features
 
 - Project initialization with `scargo new <name>`
