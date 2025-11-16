@@ -1,1 +1,8 @@
 /target
+.history/
+.metals/
+.vscode/
+.bsp/
+.scala-build/
+*.log
+*.mv.db
