@@ -1,0 +1,22 @@
+# crates/sinter/Cargo.toml
+[package]
+name = "sinter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow      = { workspace = true }
+async-trait = { workspace = true }
+clap        = { workspace = true }
+tokio       = { workspace = true }
+reqwest     = { workspace = true }
+serde       = { workspace = true }
+toml_edit   = { workspace = true }
+config      = { workspace = true }
+dirs        = { workspace = true }
+paste       = { workspace = true }
+lazy_static = { workspace = true }
+inventory   = { workspace = true }
+serde_json  = { workspace = true }
+

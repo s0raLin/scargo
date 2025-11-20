@@ -1,14 +1,14 @@
-# Scargo 架构文档
+# Sinter 架构文档
 
 ## 项目结构
 
 ```
-scargo/
+sinter/
 ├── Cargo.toml              # Workspace 配置
 ├── src/                     # 主项目库代码
 │   ├── core/               # 核心模块
 │   │   ├── handler.rs      # CommandHandler trait
-│   │   ├── app.rs          # Scargo 应用构建器
+│   │   ├── app.rs          # Sinter 应用构建器
 │   │   └── mod.rs
 │   ├── runtime/            # 运行时模块
 │   │   ├── executor.rs     # 命令执行器
@@ -25,7 +25,7 @@ scargo/
 │   ├── Cargo.toml
 │   └── src/
 │       └── main.rs         # 主入口，注册插件
-├── scargo-plugin/          # 插件开发 API（独立 crate）
+├── sinter-plugin/          # 插件开发 API（独立 crate）
 │   ├── Cargo.toml
 │   ├── README.md
 │   └── src/lib.rs          # 插件开发 API
@@ -44,7 +44,7 @@ scargo/
 核心模块包含插件系统的核心抽象：
 
 - **CommandHandler trait**: 所有命令（内置和插件）都需要实现的 trait
-- **Scargo 结构体**: 应用构建器，使用 Builder 模式
+- **Sinter 结构体**: 应用构建器，使用 Builder 模式
 
 ### 运行时模块 (runtime)
 
@@ -58,7 +58,7 @@ scargo/
 
 - **plugins**: 独立的插件 crate，包含所有扩展插件
 - **cli**: 独立的可执行文件 crate，负责注册和运行插件
-- **scargo-plugin**: 插件开发 API crate，提供插件开发所需的所有依赖和类型
+- **sinter-plugin**: 插件开发 API crate，提供插件开发所需的所有依赖和类型
 
 这种设计的优势：
 1. **避免循环依赖**：主项目库不依赖插件，插件依赖主项目
@@ -69,17 +69,17 @@ scargo/
 ## 依赖关系
 
 ```
-scargo (lib)
+sinter (lib)
   └─ 不依赖任何插件
 
-scargo-plugin
-  └─ 依赖 scargo (lib)
+sinter-plugin
+  └─ 依赖 sinter (lib)
 
 plugins
-  └─ 依赖 scargo-plugin
+  └─ 依赖 sinter-plugin
 
 cli
-  ├─ 依赖 scargo (lib)
+  ├─ 依赖 sinter (lib)
   └─ 依赖 plugins
 ```
 
@@ -110,7 +110,7 @@ cli
 在 `plugins/src/` 中创建新插件：
 
 ```rust
-use scargo::CommandHandler;
+use sinter::CommandHandler;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use std::path::PathBuf;
@@ -148,12 +148,12 @@ pub fn my_plugin() -> MyPlugin {
 在 `cli/src/main.rs` 中：
 
 ```rust
-use scargo::Scargo;
+use sinter::Sinter;
 use plugins::{jsp_plugin, my_plugin};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    Scargo::new()
+    Sinter::new()
         .plugin(jsp_plugin())
         .plugin(my_plugin())
         .run()
@@ -168,8 +168,8 @@ async fn main() -> anyhow::Result<()> {
 cargo build
 
 # 构建特定 crate
-cargo build --package scargo
-cargo build --package scargo-plugin
+cargo build --package sinter
+cargo build --package sinter-plugin
 cargo build --package plugins
 cargo build --package cli
 

@@ -1,4 +1,4 @@
-# Scargo
+# Sinter
 
 A Cargo-like build tool for Scala projects.
 
@@ -6,21 +6,21 @@ A Cargo-like build tool for Scala projects.
 
 ## Features
 
-- Project initialization with `scargo new <name>`
-- Building Scala projects with `scargo build`
-- Running Scala applications with `scargo run`
-- Adding dependencies with `scargo add <dep>`
-- Configurable project settings via `Scargo.toml`
+- Project initialization with `sinter new <name>`
+- Building Scala projects with `sinter build`
+- Running Scala applications with `sinter run`
+- Adding dependencies with `sinter add <dep>`
+- Configurable project settings via `Sinter.toml`
 
 ## Installation
 
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/scargo.git
-cd scargo
+git clone https://github.com/yourusername/sinter.git
+cd sinter
 cargo build --release
-# Add target/release/scargo to your PATH
+# Add target/release/sinter to your PATH
 ```
 
 ### Prerequisites
@@ -32,15 +32,15 @@ cargo build --release
 
 ```bash
 # Create a new project
-scargo new hello-scala
+sinter new hello-scala
 cd hello-scala
 
 # Add a dependency
-scargo add cats
+sinter add cats
 
 # Build and run
-scargo build
-scargo run
+sinter build
+sinter run
 ```
 
 ## Usage
@@ -48,21 +48,21 @@ scargo run
 ### Getting Help
 
 ```bash
-scargo --help          # Show all commands
-scargo [command] --help # Show help for specific command
+sinter --help          # Show all commands
+sinter [command] --help # Show help for specific command
 ```
 
 ### Create a new project
 
 ```bash
-scargo new my-scala-project
+sinter new my-scala-project
 cd my-scala-project
 ```
 
 This creates a new Scala project with the following structure:
 ```
 my-scala-project/
-├── Scargo.toml          # Project configuration
+├── Sinter.toml          # Project configuration
 └── src/main/scala/
     └── Main.scala       # Main application file
 ```
@@ -70,29 +70,29 @@ my-scala-project/
 ### Build the project
 
 ```bash
-scargo build
+sinter build
 ```
 
-Compiles all Scala sources in `src/main/scala` and places compiled classes in the `target_dir` specified in `Scargo.toml`.
+Compiles all Scala sources in `src/main/scala` and places compiled classes in the `target_dir` specified in `Sinter.toml`.
 
 ### Run the project
 
 ```bash
-scargo run
-scargo run path/to/MyFile.scala
-scargo run --lib
+sinter run
+sinter run path/to/MyFile.scala
+sinter run --lib
 ```
 
-- Without arguments: Runs the main file specified in `Scargo.toml`
+- Without arguments: Runs the main file specified in `Sinter.toml`
 - With a file path: Runs the specified Scala file
 - `--lib`: Forces library mode (compile only, no execution)
 
 ### Add dependencies
 
 ```bash
-scargo add cats
-scargo add org.typelevel::cats-core_2.13:2.10.0
-scargo add cats@2.13:2.10.0
+sinter add cats
+sinter add org.typelevel::cats-core_2.13:2.10.0
+sinter add cats@2.13:2.10.0
 ```
 
 Dependency format: `group::artifact[@scala-version][:version]`
@@ -103,7 +103,7 @@ Dependency format: `group::artifact[@scala-version][:version]`
 
 ## Configuration
 
-Project configuration is stored in `Scargo.toml`:
+Project configuration is stored in `Sinter.toml`:
 
 ```toml
 [package]
@@ -123,14 +123,14 @@ target_dir = "target"
 ### Common Issues
 
 - **Scala CLI not found**: Make sure Scala CLI is installed and available in your PATH
-- **Build fails**: Check that all dependencies are correctly specified in `Scargo.toml`
+- **Build fails**: Check that all dependencies are correctly specified in `Sinter.toml`
 - **Run fails**: Ensure your main file has a proper entry point (extends App or has a main method)
 
 ### Getting More Help
 
-- Run `scargo --help` for command overview
+- Run `sinter --help` for command overview
 - Check the [Scala CLI documentation](https://scala-cli.virtuslab.org/) for Scala-specific issues
-- Report issues on the [GitHub repository](https://github.com/yourusername/scargo)
+- Report issues on the [GitHub repository](https://github.com/yourusername/sinter)
 
 ## License
 
