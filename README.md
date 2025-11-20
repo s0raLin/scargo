@@ -7,9 +7,13 @@ A Cargo-like build tool for Scala projects.
 ## Features
 
 - Project initialization with `sinter new <name>`
+- Workspace initialization with `sinter init`
 - Building Scala projects with `sinter build`
 - Running Scala applications with `sinter run`
 - Adding dependencies with `sinter add <dep>`
+- Running tests with `sinter test`
+- Workspace management with `sinter workspace`
+- Internationalization support with `sinter i18n`
 - Configurable project settings via `project.toml`
 
 ## Installation
@@ -17,7 +21,7 @@ A Cargo-like build tool for Scala projects.
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/sinter.git
+git clone https://github.com/s0raLin/sinter.git
 cd sinter
 cargo build --release
 # Add target/release/sinter to your PATH
@@ -52,6 +56,16 @@ sinter --help          # Show all commands
 sinter [command] --help # Show help for specific command
 ```
 
+### Initialize a workspace
+
+```bash
+mkdir my-workspace
+cd my-workspace
+sinter init
+```
+
+This creates a workspace configuration file `workspace.project.toml`.
+
 ### Create a new project
 
 ```bash
@@ -66,6 +80,14 @@ my-scala-project/
 └── src/main/scala/
     └── Main.scala       # Main application file
 ```
+
+### Manage workspace
+
+```bash
+sinter workspace add path/to/project
+```
+
+Adds a project to the workspace.
 
 ### Build the project
 
@@ -101,6 +123,15 @@ Dependency format: `group::artifact[@scala-version][:version]`
 - `org.typelevel::cats-core_2.13:2.10.0`: Full specification with group, artifact, Scala version, and version
 - `cats@2.13:2.10.0`: Short form with Scala version and version
 
+### Run tests
+
+```bash
+sinter test
+sinter test path/to/TestFile.scala
+```
+
+Runs tests in the project or a specific test file.
+
 ## Configuration
 
 Project configuration is stored in `project.toml`:
@@ -130,7 +161,7 @@ target_dir = "target"
 
 - Run `sinter --help` for command overview
 - Check the [Scala CLI documentation](https://scala-cli.virtuslab.org/) for Scala-specific issues
-- Report issues on the [GitHub repository](https://github.com/yourusername/sinter)
+- Report issues on the [GitHub repository](https://github.com/s0raLin/sinter)
 
 ## License
 

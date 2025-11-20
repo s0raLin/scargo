@@ -7,9 +7,13 @@
 ## 功能特性
 
 - 使用 `sinter new <name>` 初始化项目
+- 使用 `sinter init` 初始化工作空间
 - 使用 `sinter build` 构建 Scala 项目
 - 使用 `sinter run` 运行 Scala 应用程序
 - 使用 `sinter add <dep>` 添加依赖
+- 使用 `sinter test` 运行测试
+- 使用 `sinter workspace` 管理工作空间
+- 使用 `sinter i18n` 支持国际化
 - 通过 `project.toml` 配置项目设置
 
 ## 快速开始
@@ -32,7 +36,7 @@ sinter run
 ### 从源码安装
 
 ```bash
-git clone https://github.com/yourusername/sinter.git
+git clone https://github.com/s0raLin/sinter.git
 cd sinter
 cargo build --release
 # 将 target/release/sinter 添加到 PATH
@@ -52,6 +56,16 @@ sinter --help          # 显示所有命令
 sinter [command] --help # 显示特定命令的帮助
 ```
 
+### 初始化工作空间
+
+```bash
+mkdir my-workspace
+cd my-workspace
+sinter init
+```
+
+这将创建工作空间配置文件 `workspace.project.toml`。
+
 ### 创建新项目
 
 ```bash
@@ -66,6 +80,14 @@ my-scala-project/
 └── src/main/scala/
     └── Main.scala       # 主应用程序文件
 ```
+
+### 管理工作空间
+
+```bash
+sinter workspace add path/to/project
+```
+
+向工作空间添加项目。
 
 ### 构建项目
 
@@ -101,6 +123,15 @@ sinter add cats@2.13:2.10.0
 - `org.typelevel::cats-core_2.13:2.10.0`：完整规范，包括组、制品、Scala 版本和版本
 - `cats@2.13:2.10.0`：简短形式，包含 Scala 版本和版本
 
+### 运行测试
+
+```bash
+sinter test
+sinter test path/to/TestFile.scala
+```
+
+运行项目中的测试或特定测试文件。
+
 ## 配置
 
 项目配置存储在 `project.toml` 中：
@@ -130,7 +161,7 @@ target_dir = "target"
 
 - 运行 `sinter --help` 获取命令概览
 - 查看 [Scala CLI 文档](https://scala-cli.virtuslab.org/) 了解 Scala 相关问题
-- 在 [GitHub 仓库](https://github.com/yourusername/sinter) 上报告问题
+- 在 [GitHub 仓库](https://github.com/s0raLin/sinter) 上报告问题
 
 ## 许可证
 
