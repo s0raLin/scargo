@@ -8,10 +8,10 @@ pub async fn cmd_new(cwd: &PathBuf, name: &str) -> anyhow::Result<()> {
     }
     tokio::fs::create_dir_all(proj_dir.join("src/main/scala")).await?;
 
-    // Sinter.toml
-    let template = include_str!("../../templates/sinter.toml.template");
+    // project.toml
+    let template = include_str!("../../templates/project.toml.template");
     let manifest = template.replace("{name}", name);
-    tokio::fs::write(proj_dir.join("Package.toml"), manifest).await?;
+    tokio::fs::write(proj_dir.join("project.toml"), manifest).await?;
 
     // Hello world
     let code = include_str!("../../templates/main.scala.template");

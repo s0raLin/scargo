@@ -76,7 +76,7 @@ fn default_backend() -> String {
 }
 
 pub fn load_project(dir: &Path) -> anyhow::Result<Project> {
-    let manifest_path = dir.join("Sinter.toml");
+    let manifest_path = dir.join("project.toml");
     let settings = Config::builder()
         .add_source(config::File::from(manifest_path))
         .build()?;
@@ -167,7 +167,7 @@ pub fn get_main_file_path(project: &Project) -> std::path::PathBuf {
 pub fn find_workspace_root(start_dir: &Path) -> Option<std::path::PathBuf> {
     let mut current = start_dir;
     loop {
-        let manifest = current.join("Sinter.toml");
+        let manifest = current.join("project.toml");
         if manifest.exists() {
             if let Ok(settings) = Config::builder()
                 .add_source(config::File::from(manifest.clone()))
@@ -190,7 +190,7 @@ pub fn find_workspace_root(start_dir: &Path) -> Option<std::path::PathBuf> {
 }
 
 pub fn load_workspace(dir: &Path) -> anyhow::Result<Option<(Project, Vec<Project>)>> {
-    let manifest_path = dir.join("Sinter.toml");
+    let manifest_path = dir.join("project.toml");
     if !manifest_path.exists() {
         return Ok(None);
     }
@@ -218,7 +218,7 @@ pub fn add_dependency_to_manifest(manifest_path: &Path, key: &str, version: &str
     // 步骤 1：解析为 Document<String>
     let mut doc: DocumentMut = content
         .parse()
-        .context("Failed to parse Sinter.toml as TOML document")?;
+        .context("Failed to parse project.toml as TOML document")?;
 
     // 确保 dependencies 表存在
     let deps_key = "dependencies";
@@ -242,7 +242,7 @@ pub fn add_dependency_to_manifest(manifest_path: &Path, key: &str, version: &str
 
 pub fn add_workspace_member(manifest_path: &Path, member_path: &str) -> anyhow::Result<()> {
     let content = std::fs::read_to_string(manifest_path)?;
-    let mut doc: DocumentMut = content.parse().context("Failed to parse Sinter.toml")?;
+    let mut doc: DocumentMut = content.parse().context("Failed to parse project.toml")?;
 
     // Ensure workspace table exists
     let ws_key = "workspace";

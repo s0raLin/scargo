@@ -29,11 +29,23 @@ pub enum Commands {
     Jsp {
         name: String,
     },
+    I18n {
+        subcommand: I18nCommands,
+    },
 }
 
 pub enum WorkspaceCommands {
     Add {
         path: String,
+    },
+}
+
+pub enum I18nCommands {
+    Export {
+        file: Option<PathBuf>,
+    },
+    Import {
+        file: PathBuf,
     },
 }
 
@@ -109,6 +121,29 @@ impl Cli {
                                     .required(true)
                             )
                     )
+            )
+            .subcommand(
+                Command::new("i18n")
+                    .about("国际化翻译管理")
+                    .subcommand(
+                        Command::new("export")
+                            .about("导出翻译到JSON文件")
+                            .arg(
+                                Arg::new("file")
+                                    .help("输出文件路径（默认为i18n.json）")
+                                    .value_name("FILE")
+                            )
+                    )
+                    .subcommand(
+                        Command::new("import")
+                            .about("从JSON文件导入翻译")
+                            .arg(
+                                Arg::new("file")
+                                    .help("输入JSON文件路径")
+                                    .value_name("FILE")
+                                    .required(true)
+                            )
+                    )
             );
 
         // 自动添加所有插件命令
@@ -153,6 +188,22 @@ impl Cli {
             Some(Commands::Jsp {
                 name: sub_m.get_one::<String>("name").unwrap().clone(),
             })
+        } else if let Some(i18n_m) = matches.subcommand_matches("i18n") {
+            if let Some(sub_m) = i18n_m.subcommand_matches("export") {
+                Some(Commands::I18n {
+                    subcommand: I18nCommands::Export {
+                        file: sub_m.get_one::<String>("file").map(|s| PathBuf::from(s)),
+                    }
+                })
+            } else if let Some(sub_m) = i18n_m.subcommand_matches("import") {
+                Some(Commands::I18n {
+                    subcommand: I18nCommands::Import {
+                        file: PathBuf::from(sub_m.get_one::<String>("file").unwrap()),
+                    }
+                })
+            } else {
+                None
+            }
         } else {
             None
         };

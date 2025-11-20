@@ -16,107 +16,28 @@ impl Language {
     }
 }
 
+impl From<&str> for Language {
+    fn from(s: &str) -> Self {
+        match s {
+            "zh" => Language::Zh,
+            _ => Language::En,
+        }
+    }
+}
+
 pub struct I18n {
-    messages: HashMap<&'static str, HashMap<Language, &'static str>>,
+    messages: HashMap<Language, HashMap<String, String>>,
 }
 
 impl I18n {
-    fn load_translations() -> HashMap<&'static str, HashMap<Language, &'static str>> {
-        let mut messages: HashMap<&'static str, HashMap<Language, &'static str>> = HashMap::new();
-
-        // Mapping from description to key
-        let description_to_key = [
-            ("应用主描述", "main_about"),
-            ("Application main description", "main_about"),
-            ("new (name=项目名称)", "new_about"),
-            ("New command description", "new_about"),
-            ("init", "init_about"),
-            ("Init command description", "init_about"),
-            ("build", "build_about"),
-            ("Build command description", "build_about"),
-            ("run (file=文件, lib=库标志)", "run_about"),
-            ("Run command description", "run_about"),
-            ("add (dep=依赖)", "add_about"),
-            ("Add command description", "add_about"),
-            ("workspace", "workspace_about"),
-            ("Workspace command description", "workspace_about"),
-            ("workspace add (path=路径)", "workspace_add_about"),
-            ("Workspace add subcommand description", "workspace_add_about"),
-            ("new name", "new_name_help"),
-            ("New command name parameter help", "new_name_help"),
-            ("run file", "run_file_help"),
-            ("Run command file parameter help", "run_file_help"),
-            ("run lib", "run_lib_help"),
-            ("Run command lib flag help", "run_lib_help"),
-            ("add dep", "add_dep_help"),
-            ("Add command dependency parameter help", "add_dep_help"),
-            ("workspace add path", "workspace_add_path_help"),
-            ("Workspace add path parameter help", "workspace_add_path_help"),
-            ("test (file=文件)", "test_about"),
-            ("Test command description", "test_about"),
-            ("test file", "test_file_help"),
-            ("Test command file parameter help", "test_file_help"),
-            ("项目已存在错误", "project_already_exists"),
-            ("Project already exists error", "project_already_exists"),
-            ("创建新项目消息", "created_project"),
-            ("Created project message", "created_project"),
-            ("Initialized empty workspace message", "initialized_empty_workspace"),
-            ("Added workspace member message", "added_member_to_workspace"),
-            ("Member already exists error", "member_already_exists"),
-            ("Added dependency message", "added_dependency"),
-            ("Built member message", "built_member"),
-            ("Build succeeded with dependencies message", "build_succeeded_with_deps"),
-            ("Library compile mode message", "lib_compiled_only"),
-            ("Main file not found error", "main_file_not_found"),
-            ("No command provided error", "no_command_provided"),
-            ("Config file already exists error", "config_file_already_exists"),
-            ("Not in workspace error", "not_in_workspace"),
-        ];
-
-        let description_map: HashMap<&str, &str> = description_to_key.iter().cloned().collect();
-
-        // Load English translations
-        let en_content = include_str!("../templates/i18n.en.template");
-        for line in en_content.lines() {
-            let line = line.trim();
-            // Skip empty lines
-            if line.is_empty() {
-                continue;
-            }
-            if let Some((description, value)) = line.split_once(':') {
-                let description = description.trim();
-                let value = value.trim();
-                if let Some(&key) = description_map.get(description) {
-                    let key_static = Box::leak(key.to_string().into_boxed_str());
-                    let value_static = Box::leak(value.to_string().into_boxed_str());
-                    messages.entry(key_static).or_insert_with(HashMap::new).insert(Language::En, value_static);
-                }
-            }
+    fn load_translations() -> HashMap<Language, HashMap<String, String>> {
+        let json: HashMap<String, HashMap<String, String>> =
+            serde_json::from_str(include_str!("../templates/i18n.json")).unwrap();
+        let mut messages = HashMap::new();
+        for (lang_str, translations) in json {
+            let lang = Language::from(lang_str.as_str());
+            messages.insert(lang, translations);
         }
-
-        // Load Chinese translations
-        let zh_content = include_str!("../templates/i18n.zh.template");
-        for line in zh_content.lines() {
-            let line = line.trim();
-            // Skip empty lines
-            if line.is_empty() {
-                continue;
-            }
-            // Try Chinese colon first, then English colon
-            let (description, value) = if let Some((d, v)) = line.split_once('：') {
-                (d.trim(), v.trim())
-            } else if let Some((d, v)) = line.split_once(':') {
-                (d.trim(), v.trim())
-            } else {
-                continue;
-            };
-            if let Some(&key) = description_map.get(description) {
-                let key_static = Box::leak(key.to_string().into_boxed_str());
-                let value_static = Box::leak(value.to_string().into_boxed_str());
-                messages.entry(key_static).or_insert_with(HashMap::new).insert(Language::Zh, value_static);
-            }
-        }
-
         messages
     }
 
@@ -128,20 +49,56 @@ impl I18n {
     pub fn get(&self, key: &str) -> String {
         let lang = Language::from_env();
         self.messages
-            .get(key)
-            .and_then(|lang_map| lang_map.get(&lang))
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| key.to_string()) // 如果找不到翻译，返回key本身
+            .get(&lang)
+            .and_then(|m| m.get(key))
+            .cloned()
+            .unwrap_or_else(|| key.to_string())
     }
 
     pub fn format(&self, key: &str, args: &[&str]) -> String {
         let template = self.get(key);
-        let mut result = template.clone();
-        for (i, arg) in args.iter().enumerate() {
-            let placeholder = format!("{{{}}}", i);
-            result = result.replace(&placeholder, arg);
+        let mut result = template;
+        for arg in args {
+            if result.contains("{}") {
+                result = result.replacen("{}", arg, 1);
+            } else {
+                break;
+            }
         }
         result
+    }
+
+    /// 导出翻译到JSON文件
+    pub fn export_to_json(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let json_data: std::collections::HashMap<String, std::collections::HashMap<String, String>> = self.messages
+            .iter()
+            .map(|(lang, translations)| {
+                let lang_str = match lang {
+                    Language::En => "en".to_string(),
+                    Language::Zh => "zh".to_string(),
+                };
+                (lang_str, translations.clone())
+            })
+            .collect();
+
+        let json = serde_json::to_string_pretty(&json_data)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// 从JSON文件加载翻译
+    pub fn load_from_json(path: &std::path::Path) -> anyhow::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        let json: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
+            serde_json::from_str(&content)?;
+
+        let mut messages = std::collections::HashMap::new();
+        for (lang_str, translations) in json {
+            let lang = Language::from(lang_str.as_str());
+            messages.insert(lang, translations);
+        }
+
+        Ok(Self { messages })
     }
 }
 

@@ -10,7 +10,7 @@
 - 使用 `sinter build` 构建 Scala 项目
 - 使用 `sinter run` 运行 Scala 应用程序
 - 使用 `sinter add <dep>` 添加依赖
-- 通过 `Sinter.toml` 配置项目设置
+- 通过 `project.toml` 配置项目设置
 
 ## 快速开始
 
@@ -62,7 +62,7 @@ cd my-scala-project
 这将创建一个具有以下结构的 Scala 项目：
 ```
 my-scala-project/
-├── Sinter.toml          # 项目配置
+├── project.toml          # 项目配置
 └── src/main/scala/
     └── Main.scala       # 主应用程序文件
 ```
@@ -73,7 +73,7 @@ my-scala-project/
 sinter build
 ```
 
-编译 `src/main/scala` 中的所有 Scala 源代码，并将编译后的类放在 `Sinter.toml` 中指定的 `target_dir`。
+编译 `src/main/scala` 中的所有 Scala 源代码，并将编译后的类放在 `project.toml` 中指定的 `target_dir`。
 
 ### 运行项目
 
@@ -83,7 +83,7 @@ sinter run path/to/MyFile.scala
 sinter run --lib
 ```
 
-- 无参数：运行 `Sinter.toml` 中指定的主文件
+- 无参数：运行 `project.toml` 中指定的主文件
 - 指定文件路径：运行指定的 Scala 文件
 - `--lib`：强制库模式（仅编译，不执行）
 
@@ -103,7 +103,7 @@ sinter add cats@2.13:2.10.0
 
 ## 配置
 
-项目配置存储在 `Sinter.toml` 中：
+项目配置存储在 `project.toml` 中：
 
 ```toml
 [package]
@@ -123,7 +123,7 @@ target_dir = "target"
 ### 常见问题
 
 - **找不到 Scala CLI**：确保 Scala CLI 已安装并在 PATH 中可用
-- **构建失败**：检查 `Sinter.toml` 中的所有依赖是否正确指定
+- **构建失败**：检查 `project.toml` 中的所有依赖是否正确指定
 - **运行失败**：确保主文件具有正确的入口点（extends App 或具有 main 方法）
 
 ### 获取更多帮助
