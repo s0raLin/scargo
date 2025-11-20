@@ -1,5 +1,4 @@
-use std::{env::current_dir, path::PathBuf};
-
+use std::path::PathBuf;
 
 pub async fn cmd_new(cwd: &PathBuf, name: &str) -> anyhow::Result<()> {
     let proj_dir = cwd.join(name);

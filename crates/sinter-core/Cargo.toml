@@ -4,6 +4,7 @@ name = "sinter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Core engine for sinter"
 
 [dependencies]
 anyhow      = { workspace = true }
