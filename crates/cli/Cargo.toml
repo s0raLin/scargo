@@ -1,0 +1,12 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+scargo = { path = "../scargo" }
+plugins = { path = "../plugins" }
+anyhow.workspace = true
+tokio.workspace = true
+

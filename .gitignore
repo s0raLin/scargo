@@ -1,8 +1,14 @@
 /target
+/.bsp/
+/.scala-build/
 .history/
 .metals/
 .vscode/
-.bsp/
-.scala-build/
+**/.idea/
+**/.bloop/
+**/.scala-build/
+**/.bsp/
+**/target/
+**/build/
 *.log
 *.mv.db

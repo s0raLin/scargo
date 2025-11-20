@@ -1,18 +1,10 @@
-use anyhow::Context;
 use std::path::Path;
-use toml_edit::{value, DocumentMut, Item, Table};
 use reqwest;
 use serde_json;
 
 pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Result<()> {
-    let project = crate::core::project::Project::load(project_dir)?;
+    let project = crate::config::load_project(project_dir)?;
     let manifest_path = project_dir.join("Scargo.toml");
-    let content = std::fs::read_to_string(&manifest_path)?;
-
-    // 步骤 1：解析为 Document<String>
-    let mut doc: DocumentMut = content
-        .parse()
-        .context("Failed to parse Scargo.toml as TOML document")?;
 
     let (artifact, scala_ver, version) = parse_dep_spec(dep_spec, &project.package.scala_version).await?;
 
@@ -28,24 +20,8 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
         key
     };
 
-    // 确保 dependencies 表存在
-    let deps_key = "dependencies";
-    if !doc.contains_key(deps_key) {
-        doc.insert(deps_key, Item::Table(Table::new()));
-    }
-
-    let deps_item = doc.get_mut(deps_key).unwrap();
-    if let Some(deps_table) = deps_item.as_table_mut() {
-        deps_table[&full_key] = value(version.clone());
-
-        // 美化格式
-        let decor = deps_table.decor_mut();
-        decor.set_prefix("\n");
-        decor.set_suffix("\n");
-    }
-
-    std::fs::write(manifest_path, doc.to_string())?;
-    println!("Added dependency: {} = {}", full_key, version);
+    crate::config::add_dependency_to_manifest(&manifest_path, &full_key, &version)?;
+    println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &version]));
     Ok(())
 }
 

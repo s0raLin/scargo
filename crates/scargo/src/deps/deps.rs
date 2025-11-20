@@ -30,19 +30,3 @@ impl Dependency {
 
 }
 
-// 从 Scargo.toml 解析依赖
-pub fn parse_dependencies(manifest: &toml::Value) -> anyhow::Result<Vec<Dependency>> {
-    let deps_table = manifest
-        .get("dependencies")
-        .and_then(|v| v.as_table())
-        .ok_or_else(|| anyhow::anyhow!("No [dependencies] section"))?;
-
-    let mut deps = Vec::new();
-    for (key, value) in deps_table {
-        let version = value
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Dependency version must be string: {}", key))?;
-        deps.push(Dependency::from_toml_key(key, version));
-    }
-    Ok(deps)
-}
