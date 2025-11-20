@@ -1,6 +1,6 @@
 # crates/sinter-cli/Cargo.toml   ← 修改这里
 [package]
-name = "sinter-cli"               # ← 改成这个（随便起，只要不是 scargo）
+name = "sinter-cli"     
 # 或者 name = "sinter-cli"
 version.workspace = true
 edition.workspace = true
@@ -15,3 +15,4 @@ sinter = { path = "../sinter-core" }
 sinter-plugins = { path = "../sinter-plugins" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
+
