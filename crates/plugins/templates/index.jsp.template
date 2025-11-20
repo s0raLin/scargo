@@ -1,0 +1,13 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JSP Web Application</title>
+</head>
+<body>
+    <h1>Hello, JSP World!</h1>
+    <p>This is a sample JSP page.</p>
+    <p>Current time: <%= new java.util.Date() %></p>
+</body>
+</html>

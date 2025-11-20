@@ -1,0 +1,8 @@
+{
+    "dependencies": {
+        "dependency": []
+    },
+    "scalac": {
+        "scalacOption": ["{scalac_option}"]
+    }
+}

@@ -1,0 +1,79 @@
+use std::path::PathBuf;
+use tokio::process::Command;
+
+pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
+    let workspace_root = crate::config::find_workspace_root(cwd);
+    let (project, project_dir) = if let Some(ws_root) = workspace_root.as_ref() {
+        // In workspace, check if this is a member project
+        if let Some((_ws_proj, members)) = crate::config::load_workspace(ws_root)? {
+            let relative_path = cwd.strip_prefix(ws_root).unwrap();
+            if let Some(first_component) = relative_path.components().next() {
+                let member_name = first_component.as_os_str().to_str().unwrap();
+                if let Some(member) = members.into_iter().find(|m| m.package.name == member_name) {
+                    (member, ws_root.clone().join(member_name))
+                } else {
+                    // Not a workspace member, treat as standalone project
+                    let proj = crate::config::load_project(cwd)?;
+                    (proj, cwd.clone())
+                }
+            } else {
+                // cwd == ws_root, treat as standalone project
+                let proj = crate::config::load_project(cwd)?;
+                (proj, cwd.clone())
+            }
+        } else {
+            // No workspace config, treat as standalone project
+            let proj = crate::config::load_project(cwd)?;
+            (proj, cwd.clone())
+        }
+    } else {
+        let proj = crate::config::load_project(cwd)?;
+        (proj, cwd.clone())
+    };
+
+    let deps = if let Some(ws_root) = workspace_root {
+        let ws_proj = crate::config::load_project(&ws_root)?;
+        crate::config::get_dependencies_with_workspace(&project, Some(&ws_proj))
+    } else {
+        crate::config::get_dependencies(&project)
+    };
+
+    let test_target = if let Some(f) = file {
+        f
+    } else {
+        PathBuf::from(&project.package.test_dir)
+    };
+
+    let abs_test_target = project_dir.join(&test_target);
+
+    if !abs_test_target.exists() {
+        println!("No tests found in {}", test_target.display());
+        return Ok(());
+    }
+
+    // Use scala-cli test
+    let mut cmd = Command::new("scala-cli");
+    cmd.arg("test").arg(&abs_test_target);
+    cmd.current_dir(&project_dir);
+
+    for dep in deps {
+        cmd.arg("--dependency").arg(dep.coord());
+    }
+
+    let output = cmd.output().await?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !stdout.is_empty() {
+        println!("{}", stdout);
+    }
+    if !stderr.is_empty() {
+        eprintln!("{}", stderr);
+    }
+
+    if !output.status.success() {
+        anyhow::bail!("Test failed");
+    }
+
+    Ok(())
+}
