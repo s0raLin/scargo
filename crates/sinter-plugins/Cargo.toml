@@ -1,0 +1,9 @@
+# crates/plugins/Cargo.toml
+[package]
+name = "sinter-plugins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sinter-plugin-api = { path = "../sinter-plugin-api" }

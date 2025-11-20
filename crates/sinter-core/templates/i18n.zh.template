@@ -1,0 +1,43 @@
+应用主描述: 一个类似Cargo的Scala构建工具
+new (name=项目名称): 创建一个新的Scala项目
+项目已存在错误: 项目 '{0}' 已存在
+Created project message: 已创建项目 `{0}`
+Initialized empty workspace message: 已初始化空工作空间于 {0}
+Added workspace member message: 已添加成员 '{0}' 到工作空间
+Member already exists error: 成员 '{0}' 已存在于工作空间
+Added dependency message: 已添加依赖: {0} = {1}
+Built member message: 已构建成员: {0}
+Build succeeded with dependencies message: 构建成功，包含 {0} 个依赖
+Library compile mode message: 库: {0} (仅编译)
+Main file not found error: 未找到主文件: {0}
+No command provided error: 未提供命令。使用 --help 获取用法。
+Config file already exists error: Sinter.toml 已存在于此目录
+Application main description: 一个类似Cargo的Scala构建工具
+New command description: 创建一个新的Scala项目
+Init command description: 初始化一个新的工作空间
+Build command description: 构建Scala项目
+Run command description: 运行Scala项目或特定文件
+Add command description: 向项目添加依赖
+Workspace command description: 工作空间管理
+Workspace add subcommand description: 向工作空间添加成员
+New command name parameter help: 新项目的名称
+Run command file parameter help: 可选的要运行的.scala文件（相对于项目根目录）
+Run command lib flag help: 强制库模式（仅编译）
+Add command dependency parameter help: 依赖格式：group::artifact[@scala-version][:version]
+Workspace add path parameter help: 成员项目的路径
+Test command description: 运行测试
+Test command file parameter help: 可选的测试文件或目录（相对于项目根目录）
+Not in workspace error: 不在工作空间中
+init: 初始化一个新的工作空间
+build: 构建Scala项目
+run (file=文件, lib=库标志): 运行Scala项目或特定文件
+add (dep=依赖): 向项目添加依赖
+workspace: 工作空间管理
+workspace add (path=路径): 向工作空间添加成员
+new name: 新项目的名称
+run file: 可选的要运行的.scala文件（相对于项目根目录）
+run lib: 强制库模式（仅编译）
+add dep: 依赖格式：group::artifact[@scala-version][:version]
+workspace add path: 成员项目的路径
+test (file=文件): 运行测试
+test file: 可选的测试文件或目录（相对于项目根目录）

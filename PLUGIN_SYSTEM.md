@@ -1,12 +1,12 @@
-# Scargo 插件系统
+# Sinter 插件系统
 
 ## 概述
 
-Scargo 采用极致简化的插件架构，允许开发者通过实现简单的 trait 来添加新命令，整个过程只需几行代码，无需修改核心代码。
+Sinter 采用极致简化的插件架构，允许开发者通过实现简单的 trait 来添加新命令，整个过程只需几行代码，无需修改核心代码。
 
 ## 核心设计理念
 
-- **函数式Builder模式**：使用链式调用注册插件，如 `Scargo::new().plugin(A).plugin(B).run()`
+- **函数式Builder模式**：使用链式调用注册插件，如 `Sinter::new().plugin(A).plugin(B).run()`
 - **零配置注册**：插件自动注册，无需手动配置
 - **类型安全**：编译时检查插件接口
 - **运行时灵活**：支持条件加载和动态扩展
@@ -28,16 +28,16 @@ pub trait CommandHandler: Send + Sync {
 }
 ```
 
-### Scargo Builder
+### Sinter Builder
 
 使用函数式Builder模式构建应用，支持链式插件注册：
 
 ```rust
-pub struct Scargo {
+pub struct Sinter {
     plugins: Vec<Box<dyn CommandHandler>>,
 }
 
-impl Scargo {
+impl Sinter {
     pub fn new() -> Self;
     pub fn plugin<H: CommandHandler + 'static>(self, handler: H) -> Self;
     pub fn plugins<H: CommandHandler + 'static, I: IntoIterator<Item = H>>(self, handlers: I) -> Self;
@@ -74,11 +74,11 @@ simple_plugin!(
 然后在 `main.rs` 中注册：
 
 ```rust
-use scargo::{Scargo, cmd::plugin_mycommand};
+use sinter::{Sinter, cmd::plugin_mycommand};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    Scargo::new()
+    Sinter::new()
         .plugin(plugin_mycommand)
         .run()
         .await
@@ -150,12 +150,12 @@ pub use hello_plugin::plugin_hello;
 
 ```rust
 // src/main.rs - 函数式Builder模式
-use scargo::{Scargo, cmd::plugin_hello};
+use sinter::{Sinter, cmd::plugin_hello};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 链式注册插件，极致简洁
-    Scargo::new()
+    Sinter::new()
         .plugin(plugin_hello)
         .run()
         .await
@@ -207,12 +207,12 @@ pub use hello_plugin::HelloPlugin;
 
 ```rust
 // src/main.rs - 函数式Builder模式
-use scargo::{Scargo, cmd::HelloPlugin};
+use sinter::{Sinter, cmd::HelloPlugin};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 链式注册插件，极致简洁
-    Scargo::new()
+    Sinter::new()
         .plugin(HelloPlugin)
         .run()
         .await
@@ -224,11 +224,11 @@ async fn main() -> anyhow::Result<()> {
 ### 基本用法
 
 ```rust
-use scargo::{Scargo, cmd::*};
+use sinter::{Sinter, cmd::*};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    Scargo::new()
+    Sinter::new()
         .plugin(JspPlugin)
         .run()
         .await
@@ -240,13 +240,13 @@ async fn main() -> anyhow::Result<()> {
 ```rust
 // 批量注册插件
 let plugins = vec![JspPlugin, HelloPlugin, BuildPlugin];
-Scargo::new()
+Sinter::new()
     .plugins(plugins)
     .run()
     .await?;
 
 // 条件注册
-Scargo::new()
+Sinter::new()
     .plugin(BasicPlugin)
     .plugin(AdvancedPlugin)
     .run()
@@ -257,7 +257,7 @@ Scargo::new()
 
 ```rust
 // 像搭积木一样构建应用
-Scargo::new()
+Sinter::new()
     .plugin(WebPlugin)      // Web开发插件
     .plugin(DatabasePlugin) // 数据库插件
     .plugin(TestPlugin)     // 测试插件
@@ -270,11 +270,11 @@ Scargo::new()
 
 ```bash
 # 插件会自动出现在帮助中
-scargo --help
+sinter --help
 
 # 使用插件命令
-scargo jsp myapp
-scargo hello world
+sinter jsp myapp
+sinter hello world
 # 输出: Hello, world!
 ```
 
