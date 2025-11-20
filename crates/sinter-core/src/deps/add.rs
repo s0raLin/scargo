@@ -4,7 +4,7 @@ use serde_json;
 
 pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Result<()> {
     let project = crate::config::load_project(project_dir)?;
-    let manifest_path = project_dir.join("Sinter.toml");
+    let manifest_path = project_dir.join("project.toml");
 
     let (artifact, scala_ver, version) = parse_dep_spec(dep_spec, &project.package.scala_version).await?;
 

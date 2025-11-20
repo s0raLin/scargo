@@ -24,7 +24,7 @@ sinter-plugin = { path = "../sinter-plugin-api" }
 ### 2. 创建插件
 
 ```rust
-use scargo_plugin_api::*;
+use sinter_plugin_api::*;
 
 pub struct MyPlugin;
 
@@ -60,7 +60,7 @@ pub fn my_plugin() -> MyPlugin {
 
 ## 重新导出的类型
 
-通过 `use scargo_plugin_api::*;` 你可以直接使用：
+通过 `use sinter_plugin_api::*;` 你可以直接使用：
 
 - `CommandHandler` - 插件 trait
 - `async_trait` - async trait 宏
@@ -72,4 +72,3 @@ pub fn my_plugin() -> MyPlugin {
 ## 完整示例
 
 查看 `plugins/src/jsp.rs` 查看完整的插件示例。
-

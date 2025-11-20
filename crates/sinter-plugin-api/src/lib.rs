@@ -6,7 +6,7 @@
 //! ## 使用示例
 //!
 //! ```rust
-//! use scargo_plugin_api::*;
+//! use sinter_plugin_api::*;
 //!
 //! pub struct MyPlugin;
 //!

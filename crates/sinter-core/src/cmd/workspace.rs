@@ -16,7 +16,7 @@ async fn cmd_workspace_add(cwd: &PathBuf, member_path: &str) -> anyhow::Result<(
     let workspace_root = crate::config::find_workspace_root(cwd)
         .ok_or_else(|| anyhow::anyhow!("{}", crate::i18n::t("not_in_workspace_error")))?;
 
-    let manifest_path = workspace_root.join("Sinter.toml");
+    let manifest_path = workspace_root.join("project.toml");
 
     // Check if member already exists by trying to add it
     match crate::config::add_workspace_member(&manifest_path, member_path) {
@@ -27,6 +27,5 @@ async fn cmd_workspace_add(cwd: &PathBuf, member_path: &str) -> anyhow::Result<(
             println!("{}", crate::i18n::tf("member_already_exists", &[member_path]));
         }
     }
-
     Ok(())
 }

@@ -1,13 +1,11 @@
-# crates/sinter-cli/Cargo.toml   ← 修改这里
 [package]
-name = "sinter-cli"     
-# 或者 name = "sinter-cli"
+name = "sinter-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "sinter"                   
+name = "sinter"
 path = "src/main.rs"
 
 [dependencies]

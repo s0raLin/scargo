@@ -2,7 +2,7 @@
 //!
 //! 包含所有内置命令的执行逻辑
 
-use crate::cli::Commands;
+use crate::cli::{Commands, I18nCommands};
 use crate::cmd::{cmd_new, cmd_init, cmd_test, cmd_workspace};
 use crate::build::{run_scala_file, run_single_file_with_deps, setup_bsp};
 use crate::deps::add_dependency;
@@ -36,13 +36,16 @@ pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result
             // JSP 命令应该由插件系统处理
             unreachable!("JSP command should be handled by plugin system");
         }
+        Commands::I18n { subcommand } => {
+            execute_i18n(subcommand).await?;
+        }
     }
     Ok(())
 }
 
 /// 执行默认行为（无命令时）
 pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
-    if cwd.join("Sinter.toml").exists() {
+    if cwd.join("project.toml").exists() {
         let project = crate::config::load_project(cwd)?;
         let target = crate::config::get_main_file_path(&project);
         if cwd.join(&target).exists() {
@@ -188,6 +191,24 @@ async fn execute_add(cwd: &PathBuf, dep: &str) -> anyhow::Result<()> {
     let workspace_root = crate::config::find_workspace_root(cwd);
     let project_dir = workspace_root.unwrap_or(cwd.clone());
     add_dependency(&project_dir, dep).await?;
+    Ok(())
+}
+
+/// 执行国际化命令
+async fn execute_i18n(subcommand: I18nCommands) -> anyhow::Result<()> {
+    match subcommand {
+        I18nCommands::Export { file } => {
+            let output_path = file.unwrap_or_else(|| PathBuf::from("i18n.json"));
+            crate::i18n::I18N.export_to_json(&output_path)?;
+            println!("翻译已导出到: {}", output_path.display());
+        }
+        I18nCommands::Import { file } => {
+            let _new_i18n = crate::i18n::I18n::load_from_json(&file)?;
+            // 注意：这里只是演示如何加载，实际使用时可能需要替换全局实例
+            // 但由于lazy_static，这里只是验证加载是否成功
+            println!("翻译已从 {} 加载", file.display());
+        }
+    }
     Ok(())
 }
 

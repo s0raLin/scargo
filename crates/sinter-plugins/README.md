@@ -47,7 +47,7 @@ sinter-plugin = { path = "../sinter-plugin-api" }
 
 ```rust
 // src/my_plugin.rs
-use scargo_plugin_api::*;
+use sinter_plugin_api::*;
 
 pub struct MyPlugin;
 
@@ -95,7 +95,7 @@ pub use my_plugin::my_plugin;
 使用 `sinter-plugin` 的好处：
 
 - ✅ **单一依赖**：不需要关心底层依赖版本
-- ✅ **简化导入**：所有类型都通过 `use scargo_plugin_api::*;` 导入
+- ✅ **简化导入**：所有类型都通过 `use sinter_plugin_api::*;` 导入
 - ✅ **统一接口**：所有插件使用相同的 API
 - ✅ **易于维护**：依赖更新只需更新 API crate
 

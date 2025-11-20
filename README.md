@@ -10,7 +10,7 @@ A Cargo-like build tool for Scala projects.
 - Building Scala projects with `sinter build`
 - Running Scala applications with `sinter run`
 - Adding dependencies with `sinter add <dep>`
-- Configurable project settings via `Sinter.toml`
+- Configurable project settings via `project.toml`
 
 ## Installation
 
@@ -62,7 +62,7 @@ cd my-scala-project
 This creates a new Scala project with the following structure:
 ```
 my-scala-project/
-├── Sinter.toml          # Project configuration
+├── project.toml          # Project configuration
 └── src/main/scala/
     └── Main.scala       # Main application file
 ```
@@ -73,7 +73,7 @@ my-scala-project/
 sinter build
 ```
 
-Compiles all Scala sources in `src/main/scala` and places compiled classes in the `target_dir` specified in `Sinter.toml`.
+Compiles all Scala sources in `src/main/scala` and places compiled classes in the `target_dir` specified in `project.toml`.
 
 ### Run the project
 
@@ -83,7 +83,7 @@ sinter run path/to/MyFile.scala
 sinter run --lib
 ```
 
-- Without arguments: Runs the main file specified in `Sinter.toml`
+- Without arguments: Runs the main file specified in `project.toml`
 - With a file path: Runs the specified Scala file
 - `--lib`: Forces library mode (compile only, no execution)
 
@@ -103,7 +103,7 @@ Dependency format: `group::artifact[@scala-version][:version]`
 
 ## Configuration
 
-Project configuration is stored in `Sinter.toml`:
+Project configuration is stored in `project.toml`:
 
 ```toml
 [package]
@@ -123,7 +123,7 @@ target_dir = "target"
 ### Common Issues
 
 - **Scala CLI not found**: Make sure Scala CLI is installed and available in your PATH
-- **Build fails**: Check that all dependencies are correctly specified in `Sinter.toml`
+- **Build fails**: Check that all dependencies are correctly specified in `project.toml`
 - **Run fails**: Ensure your main file has a proper entry point (extends App or has a main method)
 
 ### Getting More Help
