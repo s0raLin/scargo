@@ -63,46 +63,92 @@ pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
 
 /// 执行构建命令
 async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
-    if let Some(workspace_root) = crate::config::find_workspace_root(cwd) {
-        // Workspace build
-        let (root_project, members) = crate::config::load_workspace(&workspace_root)?.unwrap();
-        for member in members {
-            let member_dir = workspace_root.join(&member.package.name);
-            let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), &member_dir).await?;
-            // For workspace builds, use target directory relative to workspace root
-            let workspace_target_dir = format!(
-                "{}/{}",
-                root_project.package.target_dir, member.package.name
-            );
-            crate::build::build::build_with_deps(
-                &member_dir,
-                &transitive_deps,
-                &member.package.source_dir,
-                &workspace_target_dir,
-                &member.package.backend,
-                Some(&workspace_root),
-            )
-            .await?;
-            println!("{}", crate::i18n::tf("built_member", &[&member.package.name]));
+    if let Ok(project) = crate::config::load_project(cwd) {
+        if project.workspace.is_some() {
+            // Workspace build - build all members
+            let (root_project, members) = crate::config::load_workspace(cwd)?.unwrap();
+            let mut all_deps = Vec::new();
+            let mut source_dirs = Vec::new();
+            let mut backend = None;
+            for member in members.iter() {
+                let member_dir = cwd.join(&member.package.name);
+                let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), &member_dir).await?;
+                all_deps.extend(transitive_deps.clone());
+                source_dirs.push((member.package.name.clone(), member.package.source_dir.clone()));
+                if backend.is_none() {
+                    backend = Some(member.package.backend.clone());
+                }
+                // For workspace builds, use target directory relative to workspace root
+                let workspace_target_dir = format!(
+                    "{}/{}",
+                    root_project.package.target_dir, member.package.name
+                );
+                crate::build::build::build_with_deps(
+                    &member_dir,
+                    &transitive_deps,
+                    &member.package.source_dir,
+                    &workspace_target_dir,
+                    &member.package.backend,
+                    Some(cwd),
+                    false, // Do not setup BSP for each member
+                    true, // is_workspace_build
+                )
+                .await?;
+                println!("{}", crate::i18n::tf("built_member", &[&member.package.name]));
+            }
+            // Setup BSP for the entire workspace
+            if let Some(bk) = backend {
+                setup_bsp(cwd, &all_deps, &source_dirs, &bk).await?;
+            }
+            println!("{}", crate::i18n::t("workspace_build_succeeded"));
+        } else {
+            // Single project or member in workspace
+            if let Some(workspace_root) = crate::config::find_workspace_root(cwd) {
+                // Build single member in workspace
+                let (root_project, members) = crate::config::load_workspace(&workspace_root)?.unwrap();
+                let member_name = cwd.strip_prefix(&workspace_root).unwrap().components().next().unwrap().as_os_str().to_str().unwrap();
+                if let Some(member) = members.into_iter().find(|m| m.package.name == member_name) {
+                    let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), cwd).await?;
+                    crate::build::build::build_with_deps(
+                        cwd,
+                        &transitive_deps,
+                        &member.package.source_dir,
+                        &member.package.target_dir,
+                        &member.package.backend,
+                        Some(&workspace_root),
+                        true, // Setup BSP for this member
+                        false, // not workspace build
+                    )
+                    .await?;
+                    println!(
+                        "{}",
+                        crate::i18n::tf("build_succeeded_with_deps", &[&transitive_deps.len().to_string()])
+                    );
+                } else {
+                    anyhow::bail!("Member {} not found in workspace", member_name);
+                }
+            } else {
+                // Single project build
+                let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
+                crate::build::build::build_with_deps(
+                    cwd,
+                    &transitive_deps,
+                    &project.package.source_dir,
+                    &project.package.target_dir,
+                    &project.package.backend,
+                    None,
+                    true, // Setup BSP for single project
+                    false, // not workspace build
+                )
+                .await?;
+                println!(
+                    "{}",
+                    crate::i18n::tf("build_succeeded_with_deps", &[&transitive_deps.len().to_string()])
+                );
+            }
         }
-        println!("{}", crate::i18n::t("workspace_build_succeeded"));
     } else {
-        // Single project build
-        let project = crate::config::load_project(cwd)?;
-        let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
-        crate::build::build::build_with_deps(
-            cwd,
-            &transitive_deps,
-            &project.package.source_dir,
-            &project.package.target_dir,
-            &project.package.backend,
-            None,
-        )
-        .await?;
-        println!(
-            "{}",
-            crate::i18n::tf("build_succeeded_with_deps", &[&transitive_deps.len().to_string()])
-        );
+        anyhow::bail!("No project.toml found in {}", cwd.display());
     }
     Ok(())
 }
@@ -154,14 +200,14 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     };
 
     // 设置 BSP 以支持 IDE
-    setup_bsp(
-        &project_dir,
-        &deps,
-        &project.package.source_dir,
-        &project.package.backend,
-        workspace_root_ref.map(|p| p.as_path()),
-    )
-    .await?;
+    let bsp_dir = workspace_root_ref.unwrap_or(&project_dir);
+    let source_dirs = if let Some(ws_root) = workspace_root_ref {
+        let member_name = project_dir.strip_prefix(ws_root).unwrap().to_str().unwrap();
+        vec![(member_name.to_string(), project.package.source_dir.clone())]
+    } else {
+        vec![("".to_string(), project.package.source_dir.clone())]
+    };
+    setup_bsp(bsp_dir, &deps, &source_dirs, &project.package.backend).await?;
 
     let target = file.unwrap_or_else(|| crate::config::get_main_file_path(&project));
 
