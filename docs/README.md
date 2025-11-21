@@ -5,7 +5,7 @@
 ## 文件结构
 
 ```
-website/
+docs/
 ├── index.html      # 主页面
 ├── styles.css      # 样式文件
 ├── script.js       # JavaScript 交互
@@ -25,7 +25,7 @@ website/
 ### 方法 1: 使用 Python 简单服务器
 
 ```bash
-cd website
+cd docs
 python -m http.server 8000
 ```
 
@@ -34,7 +34,7 @@ python -m http.server 8000
 ### 方法 2: 使用 Node.js
 
 ```bash
-cd website
+cd docs
 npx serve .
 ```
 
@@ -46,9 +46,10 @@ npx serve .
 
 ### GitHub Pages
 
-1. 将 `website/` 目录推送到 GitHub 仓库
+1. 将 `docs/` 目录推送到 GitHub 仓库
 2. 在仓库设置中启用 GitHub Pages
-3. 选择 `main` 分支的 `website/` 目录作为源
+3. 选择 `main` 分支的 `docs/` 目录作为源
+4. 或者选择 `main` 分支作为源（自动检测 docs 目录）
 
 ### 其他平台
 
