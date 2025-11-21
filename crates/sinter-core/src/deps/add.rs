@@ -37,7 +37,11 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
 
     let key = artifact.clone();
 
-    let full_key = if !scala_ver.is_empty() && scala_ver != "latest" {
+    // 对于Java依赖（artifact包含单冒号），不添加Scala版本后缀
+    let full_key = if artifact.contains(':') && !artifact.contains("::") {
+        // Java依赖格式：group:artifact
+        key
+    } else if !scala_ver.is_empty() && scala_ver != "latest" {
         format!("{}_{}", key, scala_ver)
     } else {
         key
@@ -70,15 +74,31 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
 
 
 async fn parse_dep_spec(spec: &str, default_scala_version: &str) -> anyhow::Result<(String, String, String)> {
-    let parts: Vec<&str> = spec.split("::").collect();
+    // 检查是否是Scala依赖（使用::）还是Java依赖（使用:）
+    let is_scala_format = spec.contains("::");
 
-    // 要求完整格式：group::artifact:version
-    if parts.len() != 2 {
-        anyhow::bail!("{}", crate::i18n::t("invalid_dependency_format"));
-    }
-
-    let group = parts[0];
-    let artifact_version = parts[1];
+    let (group, artifact_version, is_scala) = if is_scala_format {
+        // Scala格式：group::artifact:version
+        let parts: Vec<&str> = spec.split("::").collect();
+        if parts.len() != 2 {
+            anyhow::bail!("{}", crate::i18n::t("invalid_dependency_format"));
+        }
+        let group = parts[0];
+        let artifact_version = parts[1];
+        (group, artifact_version, true)
+    } else {
+        // Java格式：group:artifact:version
+        let parts: Vec<&str> = spec.split(':').collect();
+        if parts.len() != 3 {
+            anyhow::bail!("{}", crate::i18n::t("invalid_dependency_format"));
+        }
+        let group = parts[0];
+        let artifact = parts[1];
+        let version = parts[2];
+        // 对于Java格式，直接返回，不需要进一步解析
+        let full_artifact = format!("{}:{}", group, artifact);
+        return Ok((full_artifact, "".to_string(), version.to_string()));
+    };
 
     let av_parts: Vec<&str> = artifact_version.split(':').collect();
     if av_parts.len() != 2 {

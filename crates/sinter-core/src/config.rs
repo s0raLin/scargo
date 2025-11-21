@@ -162,7 +162,7 @@ pub async fn generate_ide_classpath(project: &Project, workspace_root: Option<&P
     // 获取依赖JAR文件的路径
     let mut classpath_entries = String::new();
     for dep in &transitive_deps {
-        if let Dependency::Maven { group, artifact, version } = dep {
+        if let Dependency::Maven { group, artifact, version, is_scala: _ } = dep {
             // coursier通常将JAR文件存储在~/.coursier/cache/v1/https/repo1.maven.org/maven2/...
             // 我们需要找到实际的JAR文件路径
             if let Some(jar_path) = find_jar_path(group, artifact, version) {
@@ -184,6 +184,36 @@ pub async fn generate_ide_classpath(project: &Project, workspace_root: Option<&P
     // 写入.classpath文件
     let classpath_path = project_dir.join(".classpath");
     std::fs::write(classpath_path, classpath_content)?;
+
+    Ok(())
+}
+
+pub async fn generate_ide_options_v2(project: &Project, workspace_root: Option<&Project>, project_dir: &Path) -> anyhow::Result<()> {
+    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root).await?;
+
+    let dep_manager = crate::deps::default_dependency_manager().await;
+    let target_dir = project_dir.join(&project.package.target_dir);
+    dep_manager.prepare_dependencies(&transitive_deps, &target_dir).await?;
+
+    // 构建依赖列表
+    let mut dependency_coords = Vec::new();
+    for dep in &transitive_deps {
+        dependency_coords.push(dep.coord());
+    }
+
+    // 读取模板（相对于crate根目录）
+    let template_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/ide-options-v2.json.template");
+    let template_content = std::fs::read_to_string(template_path)?;
+
+    // 替换模板变量
+    let dependencies_json = serde_json::to_string(&dependency_coords)?;
+    let options_content = template_content
+        .replace("{scalac_option}", "-deprecation")  // 默认scalac选项
+        .replace("\"dependency\": []", &format!("\"dependency\": {}", dependencies_json));
+
+    // 写入ide-options-v2.json文件
+    let options_path = project_dir.join("ide-options-v2.json");
+    std::fs::write(options_path, options_content)?;
 
     Ok(())
 }

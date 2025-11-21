@@ -116,13 +116,15 @@ sinter run --lib
 sinter add cats
 sinter add org.typelevel::cats-core_2.13:2.10.0
 sinter add cats@2.13:2.10.0
+sinter add io.get-coursier:coursier_2.13:2.1.25-M19
 ```
 
-Dependency format: `group::artifact[@scala-version][:version]`
+Dependency format: `group::artifact[@scala-version][:version]` (Scala) or `group:artifact:version` (Java)
 
 - `cats`: Adds the latest stable version of cats-core for the project's Scala version
 - `org.typelevel::cats-core_2.13:2.10.0`: Full specification with group, artifact, Scala version, and version
 - `cats@2.13:2.10.0`: Short form with Scala version and version
+- `io.get-coursier:coursier_2.13:2.1.25-M19`: Java dependency format (single colon) for Java libraries like coursier
 
 ### Run tests
 

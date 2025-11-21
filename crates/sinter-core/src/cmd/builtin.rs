@@ -6,60 +6,7 @@ use crate::Commands;
 use crate::cmd::{cmd_new, cmd_init, cmd_test, cmd_workspace};
 use crate::build::{run_scala_file, run_single_file_with_deps, setup_bsp};
 use crate::deps::add_dependency;
-use crate::deps::deps::Dependency;
-use crate::config::Project;
 use std::path::PathBuf;
-
-/// 显示工作空间和依赖信息
-fn print_workspace_and_dependencies(
-    project: &Project,
-    project_dir: &PathBuf,
-    workspace_root: Option<&PathBuf>,
-    workspace_project: Option<&Project>,
-) {
-    if let Some(ws_root) = workspace_root {
-        println!("{}", crate::i18n::tf("running_in_workspace", &[&ws_root.display().to_string()]));
-        
-        // 显示工作空间依赖
-        if let Some(ws_proj) = workspace_project {
-            if let Some(ws_config) = &ws_proj.workspace {
-                let ws_deps: Vec<Dependency> = ws_config.dependencies
-                    .iter()
-                    .filter_map(|(k, spec)| match spec {
-                        crate::config::DependencySpec::Simple(version) => {
-                            Some(Dependency::from_toml_key(k, version))
-                        }
-                        crate::config::DependencySpec::Detailed(detail) => {
-                            detail.version.as_ref().map(|v| Dependency::from_toml_key(k, v))
-                        }
-                    })
-                    .collect();
-                
-                if !ws_deps.is_empty() {
-                    println!("{}", crate::i18n::tf("workspace_dependencies", &[&ws_deps.len().to_string()]));
-                    for dep in &ws_deps {
-                        println!("{}", crate::i18n::tf("dependency_item", &[&dep.coord()]));
-                    }
-                } else {
-                    println!("{}", crate::i18n::t("no_workspace_dependencies"));
-                }
-            }
-        }
-    } else {
-        println!("{}", crate::i18n::tf("running_in_project", &[&project_dir.display().to_string()]));
-    }
-    
-    // 显示项目特定依赖
-    let project_deps = crate::config::get_dependencies(project);
-    if !project_deps.is_empty() {
-        println!("{}", crate::i18n::tf("project_dependencies", &[&project_deps.len().to_string()]));
-        for dep in &project_deps {
-            println!("{}", crate::i18n::tf("dependency_item", &[&dep.coord()]));
-        }
-    } else {
-        println!("{}", crate::i18n::t("no_project_dependencies"));
-    }
-}
 
 /// 执行内置命令
 pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result<()> {
@@ -103,7 +50,10 @@ pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
             let output = run_single_file_with_deps(cwd, &target, &deps).await?;
             println!("{}", output);
         } else {
-            println!("{}", crate::i18n::tf("main_file_not_found", &[&target.display().to_string()]));
+            println!(
+                "{}",
+                crate::i18n::tf("main_file_not_found", &[&target.display().to_string()])
+            );
         }
     } else {
         println!("{}", crate::i18n::t("no_command_provided"));
@@ -111,66 +61,14 @@ pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 检查当前目录是否是工作空间根目录
-fn is_workspace_root(dir: &PathBuf) -> bool {
-    if let Ok(project) = crate::config::load_project(dir) {
-        project.workspace.is_some()
-    } else {
-        false
-    }
-}
-
 /// 执行构建命令
 async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
-    // 检查当前目录是否是工作空间根目录
-    if is_workspace_root(cwd) {
-        // 在工作空间根目录：编译工作空间配置中列出的所有成员
-        let (root_project, members) = crate::config::load_workspace(cwd)?.unwrap();
-        
-        // 显示工作空间信息
-        println!("{}", crate::i18n::tf("running_in_workspace", &[&cwd.display().to_string()]));
-        
-        // 显示工作空间依赖
-        if let Some(ws_config) = &root_project.workspace {
-            let ws_deps: Vec<Dependency> = ws_config.dependencies
-                .iter()
-                .filter_map(|(k, spec)| match spec {
-                    crate::config::DependencySpec::Simple(version) => {
-                        Some(Dependency::from_toml_key(k, version))
-                    }
-                    crate::config::DependencySpec::Detailed(detail) => {
-                        detail.version.as_ref().map(|v| Dependency::from_toml_key(k, v))
-                    }
-                })
-                .collect();
-            
-            if !ws_deps.is_empty() {
-                println!("{}", crate::i18n::tf("workspace_dependencies", &[&ws_deps.len().to_string()]));
-                for dep in &ws_deps {
-                    println!("{}", crate::i18n::tf("dependency_item", &[&dep.coord()]));
-                }
-            } else {
-                println!("{}", crate::i18n::t("no_workspace_dependencies"));
-            }
-        }
-        
-        // 编译所有成员项目
+    if let Some(workspace_root) = crate::config::find_workspace_root(cwd) {
+        // Workspace build
+        let (root_project, members) = crate::config::load_workspace(&workspace_root)?.unwrap();
         for member in members {
-            let member_dir = cwd.join(&member.package.name);
+            let member_dir = workspace_root.join(&member.package.name);
             let deps = crate::config::get_dependencies_with_workspace(&member, Some(&root_project));
-
-            // 显示成员项目的依赖信息
-            println!("\n{}", crate::i18n::tf("running_in_project", &[&member_dir.display().to_string()]));
-            let project_deps = crate::config::get_dependencies(&member);
-            if !project_deps.is_empty() {
-                println!("{}", crate::i18n::tf("project_dependencies", &[&project_deps.len().to_string()]));
-                for dep in &project_deps {
-                    println!("{}", crate::i18n::tf("dependency_item", &[&dep.coord()]));
-                }
-            } else {
-                println!("{}", crate::i18n::t("no_project_dependencies"));
-            }
-
             // For workspace builds, use target directory relative to workspace root
             let workspace_target_dir = format!(
                 "{}/{}",
@@ -181,63 +79,30 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                 &deps,
                 &member.package.source_dir,
                 &workspace_target_dir,
-                Some(cwd),
+                &member.package.backend,
+                Some(&workspace_root),
             )
             .await?;
-
-            // 设置BSP以支持IDE
-            setup_bsp(
-                &member,
-                &member_dir,
-                &deps,
-                Some(cwd),
-            )
-            .await?;
-
             println!("{}", crate::i18n::tf("built_member", &[&member.package.name]));
         }
-        println!("\n{}", crate::i18n::t("workspace_build_succeeded"));
-    } else if let Some(workspace_root) = crate::config::find_workspace_root(cwd) {
-        // 在成员项目目录：只编译当前项目
-        let project = crate::config::load_project(cwd)?;
-        let root_project = crate::config::load_project(&workspace_root)?;
-        let deps = crate::config::get_dependencies_with_workspace(&project, Some(&root_project));
-        
-        // 显示项目信息
-        print_workspace_and_dependencies(&project, cwd, Some(&workspace_root), Some(&root_project));
-        
-        // 使用工作空间的 target/项目名 目录
-        let workspace_target_dir = format!(
-            "{}/{}",
-            root_project.package.target_dir, project.package.name
-        );
-        
-        crate::build::build::build_with_deps(
-            cwd,
-            &deps,
-            &project.package.source_dir,
-            &workspace_target_dir,
-            Some(&workspace_root),
-        )
-        .await?;
-        println!("\n{}", crate::i18n::tf("build_succeeded_with_deps", &[&deps.len().to_string()]));
+        println!("{}", crate::i18n::t("workspace_build_succeeded"));
     } else {
-        // 独立项目：编译当前项目
+        // Single project build
         let project = crate::config::load_project(cwd)?;
         let deps = crate::config::get_dependencies(&project);
-        
-        // 显示项目信息
-        print_workspace_and_dependencies(&project, cwd, None, None);
-        
         crate::build::build::build_with_deps(
             cwd,
             &deps,
             &project.package.source_dir,
             &project.package.target_dir,
+            &project.package.backend,
             None,
         )
         .await?;
-        println!("\n{}", crate::i18n::tf("build_succeeded_with_deps", &[&deps.len().to_string()]));
+        println!(
+            "{}",
+            crate::i18n::tf("build_succeeded_with_deps", &[&deps.len().to_string()])
+        );
     }
     Ok(())
 }
@@ -246,36 +111,6 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
 async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow::Result<()> {
     let workspace_root = crate::config::find_workspace_root(cwd);
     let workspace_root_ref = workspace_root.as_ref();
-
-    // 检查是否在工作空间根目录运行
-    if let Some(ws_root) = workspace_root_ref {
-        if cwd == ws_root {
-            // 在工作空间根目录：为所有成员设置BSP
-            let (root_project, members) = crate::config::load_workspace(ws_root)?.unwrap();
-
-            println!("{}", crate::i18n::tf("running_in_workspace", &[&ws_root.display().to_string()]));
-
-            for member in members {
-                let member_dir = ws_root.join(&member.package.name);
-                let deps = crate::config::get_dependencies_with_workspace(&member, Some(&root_project));
-
-                // 显示成员项目信息
-                println!("\n{}", crate::i18n::tf("running_in_project", &[&member_dir.display().to_string()]));
-
-                // 设置BSP以支持IDE
-                setup_bsp(
-                    &member,
-                    &member_dir,
-                    &deps,
-                    Some(ws_root),
-                )
-                .await?;
-            }
-
-            println!("\n{}", crate::i18n::t("bsp_setup_completed"));
-            return Ok(());
-        }
-    }
 
     // 确定项目配置和目录
     let (project, project_dir) = if let Some(ws_root) = workspace_root_ref {
@@ -311,24 +146,19 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     };
 
     // 获取依赖
-    let (deps, ws_proj) = if let Some(ws_root) = workspace_root_ref {
+    let deps = if let Some(ws_root) = workspace_root_ref {
         let ws_proj = crate::config::load_project(ws_root)?;
-        let deps = crate::config::get_dependencies_with_workspace(&project, Some(&ws_proj));
-        (deps, Some(ws_proj))
+        crate::config::get_dependencies_with_workspace(&project, Some(&ws_proj))
     } else {
-        let deps = crate::config::get_dependencies(&project);
-        (deps, None)
+        crate::config::get_dependencies(&project)
     };
-
-    // 显示工作空间和依赖信息
-    print_workspace_and_dependencies(&project, &project_dir, workspace_root_ref, ws_proj.as_ref());
-    println!();
 
     // 设置 BSP 以支持 IDE
     setup_bsp(
-        &project,
         &project_dir,
         &deps,
+        &project.package.source_dir,
+        &project.package.backend,
         workspace_root_ref.map(|p| p.as_path()),
     )
     .await?;
@@ -341,7 +171,10 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
 
     if lib {
         let _ = run_scala_file(&project_dir, &target, true).await?;
-        println!("{}", crate::i18n::tf("lib_compiled_only", &[&target.display().to_string()]));
+        println!(
+            "{}",
+            crate::i18n::tf("lib_compiled_only", &[&target.display().to_string()])
+        );
     } else {
         let output = run_single_file_with_deps(&project_dir, &target, &deps).await?;
         println!("{}", output);
@@ -352,9 +185,10 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
 
 /// 执行添加依赖命令
 async fn execute_add(cwd: &PathBuf, deps: &[String]) -> anyhow::Result<()> {
-    // 直接在当前目录添加依赖，add_dependency 会检测是否在工作空间根目录
+    let workspace_root = crate::config::find_workspace_root(cwd);
+    let project_dir = workspace_root.unwrap_or(cwd.clone());
     for dep in deps {
-        add_dependency(cwd, dep).await?;
+        add_dependency(&project_dir, dep).await?;
     }
     Ok(())
 }

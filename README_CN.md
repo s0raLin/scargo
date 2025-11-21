@@ -116,15 +116,17 @@ sinter run --lib
 sinter add cats
 sinter add org.typelevel::cats-core_2.13:2.10.0
 sinter add cats@2.13:2.10.0
+sinter add io.get-coursier:coursier_2.13:2.1.25-M19
 sinter add ../my-sbt-project
 sinter add sbt:../my-sbt-project
 ```
 
-依赖格式：`group::artifact[@scala-version][:version]` 或 `path/to/sbt/project`
+依赖格式：`group::artifact[@scala-version][:version]` (Scala) 或 `group:artifact:version` (Java) 或 `path/to/sbt/project`
 
 - `cats`：为项目 Scala 版本添加最新稳定版本的 cats-core
 - `org.typelevel::cats-core_2.13:2.10.0`：完整规范，包括组、制品、Scala 版本和版本
 - `cats@2.13:2.10.0`：简短形式，包含 Scala 版本和版本
+- `io.get-coursier:coursier_2.13:2.1.25-M19`：Java 依赖格式（单冒号），适用于 coursier 等 Java 库
 - `../my-sbt-project`：添加本地 sbt 项目的依赖（会自动构建 sbt 项目并包含生成的 JAR）
 - `sbt:../my-sbt-project`：显式指定 sbt 项目路径
 
