@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinter - Scala 项目的 Cargo-like 构建工具</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-cube"></i>
+                <span>Sinter</span>
+            </div>
+            <div class="nav-links">
+                <a href="#features">功能特性</a>
+                <a href="#installation">安装</a>
+                <a href="#usage">使用</a>
+                <a href="#sbt-integration">SBT 集成</a>
+                <a href="https://github.com/s0raLin/sinter" target="_blank">
+                    <i class="fab fa-github"></i> GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 英雄区域 -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="gradient-text">Sinter</span>
+                    <br>
+                    <small>Scala 项目的 Cargo-like 构建工具</small>
+                </h1>
+                <p class="hero-description">
+                    像使用 Cargo 管理 Rust 项目一样，轻松管理你的 Scala 项目。
+                    支持多后端构建、依赖管理、工作空间和跨构建系统互操作。
+                </p>
+                <div class="hero-buttons">
+                    <a href="#installation" class="btn btn-primary">
+                        <i class="fas fa-download"></i> 快速开始
+                    </a>
+                    <a href="https://github.com/s0raLin/sinter" target="_blank" class="btn btn-secondary">
+                        <i class="fab fa-github"></i> 查看源码
+                    </a>
+                </div>
+            </div>
+            <div class="hero-image">
+                <div class="code-preview">
+                    <pre><code># 创建新项目
+sinter new my-scala-app
+cd my-scala-app
+
+# 添加依赖
+sinter add cats
+
+# 构建和运行
+sinter build
+sinter run</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 功能特性 -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">功能特性</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h3>快速开始</h3>
+                    <p>一键创建 Scala 项目，自动配置构建环境和依赖管理</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                    <h3>多后端支持</h3>
+                    <p>支持 Scala CLI、SBT、Gradle、Maven 等多种构建后端</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <h3>SBT 互操作</h3>
+                    <p>无缝集成 SBT 项目，支持跨构建系统的依赖管理</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-folder-tree"></i>
+                    </div>
+                    <h3>工作空间</h3>
+                    <p>支持多项目工作空间，统一管理复杂项目结构</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <h3>国际化</h3>
+                    <p>内置多语言支持，提供中文和英文界面</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <h3>插件系统</h3>
+                    <p>可扩展的插件架构，支持自定义构建逻辑</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SBT 集成特色区域 -->
+    <section id="sbt-integration" class="sbt-integration">
+        <div class="container">
+            <div class="sbt-content">
+                <div class="sbt-text">
+                    <h2>🔗 SBT 互操作</h2>
+                    <p class="sbt-description">
+                        Sinter 现在支持与 SBT 项目的无缝互操作！你可以将现有的 SBT 项目作为依赖导入到其他项目中，实现跨构建系统的协作开发。
+                    </p>
+                    <div class="sbt-features">
+                        <div class="sbt-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>自动解析 build.sbt 依赖</span>
+                        </div>
+                        <div class="sbt-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>支持传递依赖解析</span>
+                        </div>
+                        <div class="sbt-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>兼容现有 SBT 项目结构</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sbt-demo">
+                    <div class="demo-code">
+                        <h4>在 project.toml 中添加 SBT 依赖</h4>
+                        <pre><code>[dependencies]
+sbt:my-sbt-project = ""</code></pre>
+                    </div>
+                    <div class="demo-code">
+                        <h4>SBT 项目结构示例</h4>
+                        <pre><code>my-sbt-project/
+├── build.sbt
+├── project/
+│   └── build.properties
+└── src/main/scala/
+    └── Main.scala</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 安装区域 -->
+    <section id="installation" class="installation">
+        <div class="container">
+            <h2 class="section-title">安装</h2>
+            <div class="install-tabs">
+                <div class="install-methods">
+                    <div class="install-method active" data-method="source">
+                        <h3>从源码编译</h3>
+                        <div class="install-code">
+                            <pre><code>git clone https://github.com/s0raLin/sinter.git
+cd sinter
+cargo build --release
+# 将 target/release/sinter 添加到 PATH</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="prerequisites">
+                    <h3>系统要求</h3>
+                    <ul>
+                        <li><i class="fab fa-rust"></i> Rust (最新稳定版)</li>
+                        <li><i class="fas fa-code"></i> Scala CLI (Scala 编译和执行)</li>
+                        <li><i class="fas fa-download"></i> Coursier (依赖管理，推荐)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 使用指南 -->
+    <section id="usage" class="usage">
+        <div class="container">
+            <h2 class="section-title">使用指南</h2>
+            <div class="usage-grid">
+                <div class="usage-step">
+                    <div class="step-number">1</div>
+                    <h3>创建项目</h3>
+                    <pre><code>sinter new hello-scala
+cd hello-scala</code></pre>
+                </div>
+                <div class="usage-step">
+                    <div class="step-number">2</div>
+                    <h3>添加依赖</h3>
+                    <pre><code>sinter add cats
+sinter add org.typelevel::cats-core_2.13:2.10.0</code></pre>
+                </div>
+                <div class="usage-step">
+                    <div class="step-number">3</div>
+                    <h3>构建运行</h3>
+                    <pre><code>sinter build
+sinter run</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fas fa-cube"></i>
+                    <span>Sinter</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/s0raLin/sinter" target="_blank">
+                        <i class="fab fa-github"></i> GitHub
+                    </a>
+                    <a href="https://github.com/s0raLin/sinter/blob/main/README.md" target="_blank">
+                        <i class="fas fa-book"></i> 文档
+                    </a>
+                    <a href="https://github.com/s0raLin/sinter/issues" target="_blank">
+                        <i class="fas fa-bug"></i> 问题反馈
+                    </a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Sinter. Licensed under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
