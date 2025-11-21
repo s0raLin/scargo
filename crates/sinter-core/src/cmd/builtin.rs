@@ -158,7 +158,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
         for member in members {
             let member_dir = cwd.join(&member.package.name);
             let deps = crate::config::get_dependencies_with_workspace(&member, Some(&root_project));
-            
+
             // 显示成员项目的依赖信息
             println!("\n{}", crate::i18n::tf("running_in_project", &[&member_dir.display().to_string()]));
             let project_deps = crate::config::get_dependencies(&member);
@@ -170,7 +170,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
             } else {
                 println!("{}", crate::i18n::t("no_project_dependencies"));
             }
-            
+
             // For workspace builds, use target directory relative to workspace root
             let workspace_target_dir = format!(
                 "{}/{}",
@@ -184,6 +184,16 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                 Some(cwd),
             )
             .await?;
+
+            // 设置BSP以支持IDE
+            setup_bsp(
+                &member,
+                &member_dir,
+                &deps,
+                Some(cwd),
+            )
+            .await?;
+
             println!("{}", crate::i18n::tf("built_member", &[&member.package.name]));
         }
         println!("\n{}", crate::i18n::t("workspace_build_succeeded"));
@@ -237,6 +247,36 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     let workspace_root = crate::config::find_workspace_root(cwd);
     let workspace_root_ref = workspace_root.as_ref();
 
+    // 检查是否在工作空间根目录运行
+    if let Some(ws_root) = workspace_root_ref {
+        if cwd == ws_root {
+            // 在工作空间根目录：为所有成员设置BSP
+            let (root_project, members) = crate::config::load_workspace(ws_root)?.unwrap();
+
+            println!("{}", crate::i18n::tf("running_in_workspace", &[&ws_root.display().to_string()]));
+
+            for member in members {
+                let member_dir = ws_root.join(&member.package.name);
+                let deps = crate::config::get_dependencies_with_workspace(&member, Some(&root_project));
+
+                // 显示成员项目信息
+                println!("\n{}", crate::i18n::tf("running_in_project", &[&member_dir.display().to_string()]));
+
+                // 设置BSP以支持IDE
+                setup_bsp(
+                    &member,
+                    &member_dir,
+                    &deps,
+                    Some(ws_root),
+                )
+                .await?;
+            }
+
+            println!("\n{}", crate::i18n::t("bsp_setup_completed"));
+            return Ok(());
+        }
+    }
+
     // 确定项目配置和目录
     let (project, project_dir) = if let Some(ws_root) = workspace_root_ref {
         // 在 workspace 中，查找成员项目
@@ -286,9 +326,9 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
 
     // 设置 BSP 以支持 IDE
     setup_bsp(
+        &project,
         &project_dir,
         &deps,
-        &project.package.source_dir,
         workspace_root_ref.map(|p| p.as_path()),
     )
     .await?;

@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/*",
+    "crates/*", "project/hello",
 ]
 
 [workspace.package]
@@ -23,4 +23,7 @@ dirs = "6.0.0"
 paste = "1.0"
 lazy_static = "1.4"
 inventory = "0.3"
+
+# core
+coursier = { version = "0.3", features = ["cli"] }
 
