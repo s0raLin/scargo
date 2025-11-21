@@ -3,56 +3,56 @@ use clap::{Arg, Command};
 use std::path::PathBuf;
 
 pub struct Cli {
-    pub command: Option<Commands>,
+    pub command: Option<crate::cmd::Commands>,
     pub raw_matches: clap::ArgMatches,
-}
-
-pub enum Commands {
-    New {
-        name: String
-    },
-    Init,
-    Build,
-    Run {
-        file: Option<PathBuf>,
-        lib: bool,
-    },
-    Add {
-        dep: String,
-    },
-    Test {
-        file: Option<PathBuf>,
-    },
-    Workspace {
-        subcommand: WorkspaceCommands,
-    },
-    Jsp {
-        name: String,
-    },
-    I18n {
-        subcommand: I18nCommands,
-    },
-}
-
-pub enum WorkspaceCommands {
-    Add {
-        path: String,
-    },
-}
-
-pub enum I18nCommands {
-    Export {
-        file: Option<PathBuf>,
-    },
-    Import {
-        file: PathBuf,
-    },
 }
 
 impl Cli {
 
+    // 辅助函数：安全提取必需的字符串参数
+    fn extract_required_string(matches: &clap::ArgMatches, key: &str) -> String {
+        matches.get_one::<String>(key).unwrap().clone()
+    }
+
+    // 辅助函数：安全提取可选的字符串参数并转换为PathBuf
+    fn extract_optional_path(matches: &clap::ArgMatches, key: &str) -> Option<PathBuf> {
+        matches.get_one::<String>(key).map(|s| PathBuf::from(s))
+    }
+
     pub fn parse() -> Self {
         Self::parse_with_plugins(&[])
+    }
+
+    fn parse_command_from_matches(matches: &clap::ArgMatches) -> Option<crate::cmd::Commands> {
+        match matches.subcommand() {
+            Some(("new", sub_m)) => Some(crate::cmd::Commands::New {
+                name: Self::extract_required_string(sub_m, "name"),
+            }),
+            Some(("init", _)) => Some(crate::cmd::Commands::Init),
+            Some(("build", _)) => Some(crate::cmd::Commands::Build),
+            Some(("run", sub_m)) => Some(crate::cmd::Commands::Run {
+                file: Self::extract_optional_path(sub_m, "file"),
+                lib: sub_m.get_flag("lib"),
+            }),
+            Some(("add", sub_m)) => Some(crate::cmd::Commands::Add {
+                deps: sub_m.get_many::<String>("dep").unwrap_or_default().map(|s| s.to_string()).collect(),
+            }),
+            Some(("test", sub_m)) => Some(crate::cmd::Commands::Test {
+                file: Self::extract_optional_path(sub_m, "file"),
+            }),
+            Some(("workspace", ws_m)) => match ws_m.subcommand() {
+                Some(("add", sub_m)) => Some(crate::cmd::Commands::Workspace {
+                    subcommand: crate::cmd::WorkspaceCommands::Add {
+                        paths: sub_m.get_many::<String>("path").unwrap_or_default().map(|s| s.to_string()).collect(),
+                    }
+                }),
+                _ => None,
+            },
+            Some(("jsp", sub_m)) => Some(crate::cmd::Commands::Jsp {
+                name: Self::extract_required_string(sub_m, "name"),
+            }),
+            _ => None,
+        }
     }
 
     pub fn parse_with_plugins(plugins: &[Box<dyn crate::core::CommandHandler>]) -> Self {
@@ -98,6 +98,7 @@ impl Cli {
                             .help(crate::i18n::t("add_dep_help"))
                             .value_name("DEP")
                             .required(true)
+                            .num_args(1..)
                     )
             )
             .subcommand(
@@ -118,30 +119,9 @@ impl Cli {
                             .arg(
                                 Arg::new("path")
                                     .help(crate::i18n::t("workspace_add_path_help"))
+                                    .value_name("PATH")
                                     .required(true)
-                            )
-                    )
-            )
-            .subcommand(
-                Command::new("i18n")
-                    .about("国际化翻译管理")
-                    .subcommand(
-                        Command::new("export")
-                            .about("导出翻译到JSON文件")
-                            .arg(
-                                Arg::new("file")
-                                    .help("输出文件路径（默认为i18n.json）")
-                                    .value_name("FILE")
-                            )
-                    )
-                    .subcommand(
-                        Command::new("import")
-                            .about("从JSON文件导入翻译")
-                            .arg(
-                                Arg::new("file")
-                                    .help("输入JSON文件路径")
-                                    .value_name("FILE")
-                                    .required(true)
+                                    .num_args(1..)
                             )
                     )
             );
@@ -153,60 +133,7 @@ impl Cli {
 
         let matches = cmd.get_matches();
 
-        let command = if let Some(sub_m) = matches.subcommand_matches("new") {
-            Some(Commands::New {
-                name: sub_m.get_one::<String>("name").unwrap().clone(),
-            })
-        } else if matches.subcommand_matches("init").is_some() {
-            Some(Commands::Init)
-        } else if matches.subcommand_matches("build").is_some() {
-            Some(Commands::Build)
-        } else if let Some(sub_m) = matches.subcommand_matches("run") {
-            Some(Commands::Run {
-                file: sub_m.get_one::<String>("file").map(|s| PathBuf::from(s)),
-                lib: sub_m.get_flag("lib"),
-            })
-        } else if let Some(sub_m) = matches.subcommand_matches("add") {
-            Some(Commands::Add {
-                dep: sub_m.get_one::<String>("dep").unwrap().clone(),
-            })
-        } else if let Some(sub_m) = matches.subcommand_matches("test") {
-            Some(Commands::Test {
-                file: sub_m.get_one::<String>("file").map(|s| PathBuf::from(s)),
-            })
-        } else if let Some(ws_m) = matches.subcommand_matches("workspace") {
-            if let Some(sub_m) = ws_m.subcommand_matches("add") {
-                Some(Commands::Workspace {
-                    subcommand: WorkspaceCommands::Add {
-                        path: sub_m.get_one::<String>("path").unwrap().clone(),
-                    }
-                })
-            } else {
-                None
-            }
-        } else if let Some(sub_m) = matches.subcommand_matches("jsp") {
-            Some(Commands::Jsp {
-                name: sub_m.get_one::<String>("name").unwrap().clone(),
-            })
-        } else if let Some(i18n_m) = matches.subcommand_matches("i18n") {
-            if let Some(sub_m) = i18n_m.subcommand_matches("export") {
-                Some(Commands::I18n {
-                    subcommand: I18nCommands::Export {
-                        file: sub_m.get_one::<String>("file").map(|s| PathBuf::from(s)),
-                    }
-                })
-            } else if let Some(sub_m) = i18n_m.subcommand_matches("import") {
-                Some(Commands::I18n {
-                    subcommand: I18nCommands::Import {
-                        file: PathBuf::from(sub_m.get_one::<String>("file").unwrap()),
-                    }
-                })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let command = Self::parse_command_from_matches(&matches);
 
         Cli { command, raw_matches: matches }
     }

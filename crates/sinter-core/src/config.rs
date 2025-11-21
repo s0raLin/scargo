@@ -106,28 +106,11 @@ pub fn get_dependencies(project: &Project) -> Vec<Dependency> {
 pub fn get_dependencies_with_workspace(project: &Project, workspace_root: Option<&Project>) -> Vec<Dependency> {
     let mut deps = Vec::new();
 
-    // 先添加workspace依赖
-    if let Some(ws) = workspace_root {
-        if let Some(ws_config) = &ws.workspace {
-            for (k, spec) in &ws_config.dependencies {
-                match spec {
-                    crate::config::DependencySpec::Simple(version) => {
-                        deps.push(Dependency::from_toml_key(k, &version));
-                    }
-                    crate::config::DependencySpec::Detailed(detail) => {
-                        if let Some(version) = &detail.version {
-                            deps.push(Dependency::from_toml_key(k, version));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 然后添加项目特定依赖
+    // 只添加项目中显式声明的依赖
     for (k, spec) in &project.dependencies {
         match spec {
             crate::config::DependencySpec::Simple(version) => {
+                // 简单格式的依赖直接使用项目中指定的版本
                 deps.push(Dependency::from_toml_key(k, &version));
             }
             crate::config::DependencySpec::Detailed(detail) => {
@@ -146,10 +129,14 @@ pub fn get_dependencies_with_workspace(project: &Project, workspace_root: Option
                                         }
                                     }
                                 }
+                            } else {
+                                // workspace中没有定义此依赖，跳过
+                                eprintln!("Warning: dependency '{}' marked as workspace but not found in workspace root", k);
                             }
                         }
                     }
                 } else if let Some(version) = &detail.version {
+                    // 非workspace依赖，使用项目中指定的版本
                     deps.push(Dependency::from_toml_key(k, version));
                 }
             }
@@ -240,6 +227,44 @@ pub fn add_dependency_to_manifest(manifest_path: &Path, key: &str, version: &str
     Ok(())
 }
 
+pub fn add_workspace_dependency_to_manifest(manifest_path: &Path, key: &str, version: &str) -> anyhow::Result<()> {
+    let content = std::fs::read_to_string(manifest_path)?;
+
+    // 步骤 1：解析为 Document<String>
+    let mut doc: DocumentMut = content
+        .parse()
+        .context("Failed to parse project.toml as TOML document")?;
+
+    // 确保 workspace 表存在
+    let ws_key = "workspace";
+    if !doc.contains_key(ws_key) {
+        doc.insert(ws_key, Item::Table(Table::new()));
+    }
+
+    let ws_item = doc.get_mut(ws_key).unwrap();
+    if let Some(ws_table) = ws_item.as_table_mut() {
+        // 确保 workspace.dependencies 表存在
+        let deps_key = "dependencies";
+        if !ws_table.contains_key(deps_key) {
+            ws_table.insert(deps_key, Item::Table(Table::new()));
+        }
+
+        if let Some(deps_item) = ws_table.get_mut(deps_key) {
+            if let Some(deps_table) = deps_item.as_table_mut() {
+                deps_table[key] = value(version.to_string());
+
+                // 美化格式
+                let decor = deps_table.decor_mut();
+                decor.set_prefix("\n");
+                decor.set_suffix("\n");
+            }
+        }
+    }
+
+    std::fs::write(manifest_path, doc.to_string())?;
+    Ok(())
+}
+
 pub fn add_workspace_member(manifest_path: &Path, member_path: &str) -> anyhow::Result<()> {
     let content = std::fs::read_to_string(manifest_path)?;
     let mut doc: DocumentMut = content.parse().context("Failed to parse project.toml")?;
@@ -261,10 +286,11 @@ pub fn add_workspace_member(manifest_path: &Path, member_path: &str) -> anyhow::
             if let Some(members_array) = members_item.as_array_mut() {
                 // Check if member already exists
                 let exists = members_array.iter().any(|v| v.as_str() == Some(member_path));
-                if !exists {
-                    members_array.push(member_path);
-                    std::fs::write(manifest_path, doc.to_string())?;
+                if exists {
+                    anyhow::bail!("Member '{}' already exists in workspace", member_path);
                 }
+                members_array.push(member_path);
+                std::fs::write(manifest_path, doc.to_string())?;
             }
         }
     }

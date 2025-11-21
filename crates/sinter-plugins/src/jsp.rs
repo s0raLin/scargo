@@ -12,9 +12,9 @@
 use sinter_plugin_api::*;
 
 // 嵌入模板文件
-static POM_XML_TEMPLATE: &str = include_str!("../templates/pom.xml.template");
-static WEB_XML_TEMPLATE: &str = include_str!("../templates/web.xml.template");
-static INDEX_JSP_TEMPLATE: &str = include_str!("../templates/index.jsp.template");
+static POM_XML_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/pom.xml.template"));
+static WEB_XML_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/web.xml.template"));
+static INDEX_JSP_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/index.jsp.template"));
 
 /// JSP 插件结构体
 pub struct JspPlugin;

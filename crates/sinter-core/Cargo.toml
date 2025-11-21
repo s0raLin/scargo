@@ -5,19 +5,26 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Core engine for sinter"
+build = "build.rs"
+
+[features]
+default = ["lang-en"]
+lang-en = []
+lang-zh = []
+
+[build-dependencies]
+serde_json = "1"
 
 [dependencies]
 anyhow      = { workspace = true }
 async-trait = { workspace = true }
 clap        = { workspace = true }
 tokio       = { workspace = true }
-reqwest     = { workspace = true }
 serde       = { workspace = true }
 toml_edit   = { workspace = true }
 config      = { workspace = true }
 dirs        = { workspace = true }
 paste       = { workspace = true }
-lazy_static = { workspace = true }
 inventory   = { workspace = true }
 serde_json  = { workspace = true }
 
