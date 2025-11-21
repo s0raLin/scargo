@@ -127,9 +127,13 @@ impl DependencyManager for CoursierDependencyManager {
         // target_dir参数保留以保持trait接口一致性，但coursier使用自己的缓存目录
         for dep in deps {
             match dep {
-                Dependency::Maven { group, artifact, version } => {
-                    let coord = format!("{}:{}:{}", group, artifact, version);
-                    
+                Dependency::Maven { group, artifact, version, is_scala } => {
+                    let coord = if *is_scala {
+                        format!("{}::{}:{}", group, artifact, version)
+                    } else {
+                        format!("{}:{}:{}", group, artifact, version)
+                    };
+
                     // 使用coursier fetch下载依赖（这会自动缓存）
                     let mut cmd = Command::new(&coursier_path);
                     cmd.arg("fetch")
@@ -163,9 +167,9 @@ impl DependencyManager for CoursierDependencyManager {
 
         for dep in deps {
             match dep {
-                Dependency::Maven { group, artifact, version } => {
+                Dependency::Maven { .. } => {
                     args.push("--dependency".to_string());
-                    args.push(format!("{}:{}:{}", group, artifact, version));
+                    args.push(dep.coord());
                 }
                 Dependency::Sbt { path } => {
                     if Path::new(path).is_relative() {
@@ -191,8 +195,12 @@ impl DependencyManager for CoursierDependencyManager {
             .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
 
         match dep {
-            Dependency::Maven { group, artifact, version } => {
-                let coord = format!("{}:{}:{}", group, artifact, version);
+            Dependency::Maven { group, artifact, version, is_scala } => {
+                let coord = if *is_scala {
+                    format!("{}::{}:{}", group, artifact, version)
+                } else {
+                    format!("{}:{}:{}", group, artifact, version)
+                };
 
                 // 使用coursier resolve验证依赖是否存在
                 let mut cmd = Command::new(&coursier_path);
@@ -227,8 +235,12 @@ impl DependencyManager for CoursierDependencyManager {
 
         for dep in deps {
             match dep {
-                Dependency::Maven { group, artifact, version } => {
-                    let coord = format!("{}:{}:{}", group, artifact, version);
+                Dependency::Maven { group, artifact, version, is_scala } => {
+                    let coord = if *is_scala {
+                        format!("{}::{}:{}", group, artifact, version)
+                    } else {
+                        format!("{}:{}:{}", group, artifact, version)
+                    };
 
                     // 使用coursier resolve获取传递依赖
                     let mut cmd = Command::new(&coursier_path);
@@ -271,6 +283,7 @@ impl DependencyManager for CoursierDependencyManager {
                                     group: group.to_string(),
                                     artifact: artifact.to_string(),
                                     version: version.to_string(),
+                                    is_scala: *is_scala,
                                 });
                                 processed_coords.insert(coord);
                             }
@@ -325,9 +338,9 @@ impl DependencyManager for ScalaCliDependencyManager {
 
         for dep in deps {
             match dep {
-                Dependency::Maven { group, artifact, version } => {
+                Dependency::Maven { .. } => {
                     args.push("--dependency".to_string());
-                    args.push(format!("{}:{}:{}", group, artifact, version));
+                    args.push(dep.coord());
                 }
                 Dependency::Sbt { path } => {
                     // 对于sbt依赖，尝试将其作为scala-cli项目添加
@@ -353,8 +366,12 @@ impl DependencyManager for ScalaCliDependencyManager {
     async fn validate_dependency(&self, dep: &Dependency) -> anyhow::Result<()> {
         // Scala CLI 验证：通过尝试编译一个简单的程序来验证依赖是否可用
         match dep {
-            Dependency::Maven { group, artifact, version } => {
-                let coord = format!("{}:{}:{}", group, artifact, version);
+            Dependency::Maven { group, artifact, version, is_scala } => {
+                let coord = if *is_scala {
+                    format!("{}::{}:{}", group, artifact, version)
+                } else {
+                    format!("{}:{}:{}", group, artifact, version)
+                };
 
                 // 使用scala-cli来验证依赖（通过尝试编译一个简单的程序）
                 // 这样可以确保依赖可以被正确解析和下载
@@ -393,8 +410,12 @@ impl DependencyManager for ScalaCliDependencyManager {
 
             for dep in deps {
                 match dep {
-                    Dependency::Maven { group, artifact, version } => {
-                        let coord = format!("{}:{}:{}", group, artifact, version);
+                    Dependency::Maven { group, artifact, version, is_scala } => {
+                        let coord = if *is_scala {
+                            format!("{}::{}:{}", group, artifact, version)
+                        } else {
+                            format!("{}:{}:{}", group, artifact, version)
+                        };
 
                         // 使用coursier resolve获取传递依赖
                         let mut cmd = Command::new(&coursier_path);
@@ -434,6 +455,7 @@ impl DependencyManager for ScalaCliDependencyManager {
                                         group: group.to_string(),
                                         artifact: artifact.to_string(),
                                         version: version.to_string(),
+                                        is_scala: *is_scala,
                                     });
                                     processed_coords.insert(coord);
                                 }

@@ -1,8 +1,15 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 fn main() {
+    // 下载 coursier 可执行文件
+    download_coursier();
+
     // 告诉 Cargo 如果翻译文件改变，需要重新构建
     println!("cargo:rerun-if-changed=templates/i18n.json");
     
@@ -74,7 +81,108 @@ fn main() {
     // 写入文件
     fs::write(&out_path, code)
         .expect("Failed to write generated i18n.rs");
-    
+
     println!("cargo:warning=Generated i18n.rs for language: {}", lang);
+}
+
+/// 下载 coursier 可执行文件
+fn download_coursier() {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let bin_dir = Path::new(&manifest_dir).join("bin");
+
+    // 确保 bin 目录存在
+    if !bin_dir.exists() {
+        fs::create_dir_all(&bin_dir).expect("Failed to create bin directory");
+    }
+
+    let coursier_path = bin_dir.join(if cfg!(target_os = "windows") { "coursier.exe" } else { "coursier" });
+
+    // 如果 coursier 已经存在，检查是否可用
+    if coursier_path.exists() {
+        if let Ok(output) = Command::new(&coursier_path).arg("--version").output() {
+            if output.status.success() {
+                println!("cargo:warning=coursier already exists and is working");
+                return;
+            }
+        }
+    }
+
+    // 检测平台
+    let platform = match (env::consts::OS, env::consts::ARCH) {
+        ("linux", "x86_64") => "x86_64-pc-linux",
+        ("linux", "aarch64") => "aarch64-pc-linux",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        _ => {
+            println!("cargo:warning=Unsupported platform for coursier download: {} {}", env::consts::OS, env::consts::ARCH);
+            return;
+        }
+    };
+
+    println!("cargo:warning=Downloading coursier for platform: {}", platform);
+
+    // 下载并解压 coursier
+    let url = format!("https://github.com/coursier/coursier/releases/latest/download/cs-{}.gz", platform);
+
+    let status = Command::new("sh")
+        .args(&["-c", &format!("curl -fL {} | gzip -d > {}", url, coursier_path.display())])
+        .status()
+        .expect("Failed to download and decompress coursier");
+
+    if !status.success() {
+        println!("cargo:warning=Failed to download coursier from {}", url);
+        return;
+    }
+
+    // 设置执行权限 (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&coursier_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&coursier_path, perms).unwrap();
+    }
+
+    // 设置执行权限 (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&coursier_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&coursier_path, perms).unwrap();
+    }
+
+    // 复制到输出目录的 bin 子目录
+    let out_dir = env::var("OUT_DIR").unwrap();
+    println!("cargo:warning=OUT_DIR: {}", out_dir);
+    let target_dir = Path::new(&out_dir).parent().unwrap().parent().unwrap().parent().unwrap(); // target/release
+    println!("cargo:warning=target_dir: {}", target_dir.display());
+    let target_bin_dir = target_dir.join("bin");
+
+    if !target_bin_dir.exists() {
+        fs::create_dir_all(&target_bin_dir).expect("Failed to create target bin directory");
+    }
+
+    let target_coursier_path = target_bin_dir.join(if cfg!(target_os = "windows") { "coursier.exe" } else { "coursier" });
+    fs::copy(&coursier_path, &target_coursier_path).expect("Failed to copy coursier to target directory");
+
+    // 设置目标文件的执行权限
+    #[cfg(unix)]
+    {
+        let mut perms = fs::metadata(&target_coursier_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&target_coursier_path, perms).unwrap();
+    }
+
+    // 验证安装
+    if let Ok(output) = Command::new(&target_coursier_path).arg("--version").output() {
+        if output.status.success() {
+            println!("cargo:warning=Successfully installed coursier");
+        } else {
+            println!("cargo:warning=Installed coursier but version check failed");
+        }
+    } else {
+        println!("cargo:warning=Failed to verify coursier installation");
+    }
 }
 

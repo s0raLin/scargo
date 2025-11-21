@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/*", "project/hello",
+    "crates/*",
 ]
 
 [workspace.package]
