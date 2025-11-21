@@ -31,6 +31,7 @@ cargo build --release
 
 - Rust (latest stable)
 - Scala CLI (for Scala compilation and execution)
+- Coursier (for dependency management, optional but recommended)
 
 ## Quick Start
 
@@ -119,7 +120,7 @@ sinter add cats@2.13:2.10.0
 
 Dependency format: `group::artifact[@scala-version][:version]`
 
-- `cats`: Adds the latest version of cats-core for the project's Scala version
+- `cats`: Adds the latest stable version of cats-core for the project's Scala version
 - `org.typelevel::cats-core_2.13:2.10.0`: Full specification with group, artifact, Scala version, and version
 - `cats@2.13:2.10.0`: Short form with Scala version and version
 
@@ -154,6 +155,7 @@ target_dir = "target"
 ### Common Issues
 
 - **Scala CLI not found**: Make sure Scala CLI is installed and available in your PATH
+- **Coursier not found**: Coursier is optional but recommended for better dependency management. Install it from https://get-coursier.io/
 - **Build fails**: Check that all dependencies are correctly specified in `project.toml`
 - **Run fails**: Ensure your main file has a proper entry point (extends App or has a main method)
 

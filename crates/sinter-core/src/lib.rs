@@ -20,11 +20,13 @@ pub mod cmd;
 // 宏和工具
 #[macro_use]
 pub mod commands;
-#[macro_use]
+
+// 国际化支持（构建时生成）
 pub mod i18n;
 
 // extern crate paste;
 
 // 公共 API
 pub use core::{CommandHandler, Sinter};
-pub use cli::{Cli, Commands};
+pub use cli::Cli;
+pub use cmd::{Commands, WorkspaceCommands};

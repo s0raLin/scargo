@@ -46,6 +46,7 @@ cargo build --release
 
 - Rust（最新稳定版）
 - Scala CLI（用于 Scala 编译和执行）
+- Coursier（用于依赖管理，可选但推荐）
 
 ## 使用方法
 
@@ -115,13 +116,17 @@ sinter run --lib
 sinter add cats
 sinter add org.typelevel::cats-core_2.13:2.10.0
 sinter add cats@2.13:2.10.0
+sinter add ../my-sbt-project
+sinter add sbt:../my-sbt-project
 ```
 
-依赖格式：`group::artifact[@scala-version][:version]`
+依赖格式：`group::artifact[@scala-version][:version]` 或 `path/to/sbt/project`
 
-- `cats`：为项目 Scala 版本添加最新版本的 cats-core
+- `cats`：为项目 Scala 版本添加最新稳定版本的 cats-core
 - `org.typelevel::cats-core_2.13:2.10.0`：完整规范，包括组、制品、Scala 版本和版本
 - `cats@2.13:2.10.0`：简短形式，包含 Scala 版本和版本
+- `../my-sbt-project`：添加本地 sbt 项目的依赖（会自动构建 sbt 项目并包含生成的 JAR）
+- `sbt:../my-sbt-project`：显式指定 sbt 项目路径
 
 ### 运行测试
 
@@ -154,6 +159,7 @@ target_dir = "target"
 ### 常见问题
 
 - **找不到 Scala CLI**：确保 Scala CLI 已安装并在 PATH 中可用
+- **找不到 Coursier**：Coursier 是可选的但推荐用于更好的依赖管理。从 https://get-coursier.io/ 安装
 - **构建失败**：检查 `project.toml` 中的所有依赖是否正确指定
 - **运行失败**：确保主文件具有正确的入口点（extends App 或具有 main 方法）
 

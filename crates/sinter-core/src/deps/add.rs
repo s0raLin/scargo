@@ -1,18 +1,41 @@
 use std::path::Path;
-use reqwest;
-use serde_json;
 
 pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Result<()> {
     let project = crate::config::load_project(project_dir)?;
     let manifest_path = project_dir.join("project.toml");
 
+    // 检测是否在工作空间根目录
+    let is_workspace_root = project.workspace.is_some();
+
+    // Check if it's an sbt path
+    if dep_spec.starts_with("sbt:") || (dep_spec.contains("/") && !dep_spec.contains("::")) {
+        let sbt_path = if dep_spec.starts_with("sbt:") {
+            dep_spec[4..].to_string()
+        } else {
+            dep_spec.to_string()
+        };
+
+        // Validate that the sbt project exists
+        let sbt_project_path = project_dir.join(&sbt_path);
+        if !sbt_project_path.exists() {
+            anyhow::bail!("sbt project path does not exist: {}", sbt_path);
+        }
+
+        let key = format!("sbt:{}", sbt_path);
+        // 如果在工作空间根目录，添加到 workspace.dependencies
+        if is_workspace_root {
+            crate::config::add_workspace_dependency_to_manifest(&manifest_path, &key, "")?;
+            println!("{}", crate::i18n::tf("added_dependency", &[&key, "sbt project (workspace)"]));
+        } else {
+            crate::config::add_dependency_to_manifest(&manifest_path, &key, "")?;
+            println!("{}", crate::i18n::tf("added_dependency", &[&key, "sbt project"]));
+        }
+        return Ok(());
+    }
+
     let (artifact, scala_ver, version) = parse_dep_spec(dep_spec, &project.package.scala_version).await?;
 
-    let key = if artifact.contains("::") {
-        artifact.clone()
-    } else {
-        format!("org.typelevel::{}", artifact)
-    };
+    let key = artifact.clone();
 
     let full_key = if !scala_ver.is_empty() && scala_ver != "latest" {
         format!("{}_{}", key, scala_ver)
@@ -20,77 +43,68 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
         key
     };
 
-    crate::config::add_dependency_to_manifest(&manifest_path, &full_key, &version)?;
-    println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &version]));
+    // 使用依赖管理器验证依赖是否可用
+    let dep_manager = crate::deps::default_dependency_manager().await;
+    let dep = crate::deps::deps::Dependency::from_toml_key(&full_key, &version);
+    
+    // 验证依赖是否可用
+    if let Err(e) = dep_manager.validate_dependency(&dep).await {
+        anyhow::bail!("Failed to validate dependency {}: {}\nPlease check that the dependency coordinates are correct and the version exists.", full_key, e);
+    }
+
+    // 如果验证通过，下载依赖（使用coursier时会预先下载并缓存）
+    if let Err(e) = dep_manager.prepare_dependencies(&[dep.clone()], &project_dir.join("target")).await {
+        anyhow::bail!("Failed to download dependency {}: {}\nPlease check your network connection and try again.", full_key, e);
+    }
+
+    // 如果在工作空间根目录，添加到 workspace.dependencies
+    if is_workspace_root {
+        crate::config::add_workspace_dependency_to_manifest(&manifest_path, &full_key, &version)?;
+        println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &format!("{} (workspace)", version)]));
+    } else {
+        crate::config::add_dependency_to_manifest(&manifest_path, &full_key, &version)?;
+        println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &version]));
+    }
     Ok(())
 }
 
-async fn parse_dep_spec(spec: &str, default_scala_version: &str) -> anyhow::Result<(String, String, String)> {
-    let parts: Vec<&str> = spec.split(':').collect();
-    let (artifact_part, version) = if parts.len() == 2 {
-        (parts[0], parts[1].to_string())
-    } else {
-        (parts[0], "latest".to_string())
-    };
 
-    let artifact_parts: Vec<&str> = artifact_part.split('@').collect();
-    let (mut artifact, scala_ver) = if artifact_parts.len() == 2 {
+async fn parse_dep_spec(spec: &str, default_scala_version: &str) -> anyhow::Result<(String, String, String)> {
+    let parts: Vec<&str> = spec.split("::").collect();
+
+    // 要求完整格式：group::artifact:version
+    if parts.len() != 2 {
+        anyhow::bail!("{}", crate::i18n::t("invalid_dependency_format"));
+    }
+
+    let group = parts[0];
+    let artifact_version = parts[1];
+
+    let av_parts: Vec<&str> = artifact_version.split(':').collect();
+    if av_parts.len() != 2 {
+        anyhow::bail!("{}", crate::i18n::t("invalid_dependency_format"));
+    }
+
+    let artifact_with_scala = av_parts[0];
+    let version = av_parts[1];
+
+    // 检查artifact是否包含::，如果是，则报错，因为artifact不应该有::
+    if artifact_with_scala.contains("::") {
+        anyhow::bail!("{}", crate::i18n::t("invalid_artifact_format"));
+    }
+
+    let artifact_parts: Vec<&str> = artifact_with_scala.split('@').collect();
+    let (artifact, scala_ver) = if artifact_parts.len() == 2 {
         (artifact_parts[0].to_string(), artifact_parts[1])
     } else {
-        (artifact_parts[0].to_string(), default_scala_version)
+        (artifact_with_scala.to_string(), default_scala_version)
     };
 
-    // 映射常见库到正确的 artifact id
-    if artifact == "cats" {
-        artifact = "cats-core".to_string();
+    let full_artifact = format!("{}::{}", group, artifact);
+
+    if version.is_empty() || version == "latest" {
+        anyhow::bail!("{}", crate::i18n::t("version_must_be_specified"));
     }
-    // 可以添加更多映射
 
-    let version = if version == "latest" {
-        // 查询 Maven Central 获取最新版本
-        let key = if artifact.contains("::") {
-            artifact.to_string()
-        } else {
-            format!("org.typelevel::{}", artifact)
-        };
-        let group_artifact: Vec<&str> = key.split("::").collect();
-        if group_artifact.len() != 2 {
-            anyhow::bail!("Invalid artifact format: {}", key);
-        }
-        let group_id = group_artifact[0];
-        let artifact_id = if !scala_ver.is_empty() && scala_ver != "latest" {
-            format!("{}_{}", group_artifact[1], scala_ver)
-        } else {
-            group_artifact[1].to_string()
-        };
-        get_latest_version(group_id, &artifact_id).await?
-    } else {
-        version
-    };
-
-    Ok((artifact.to_string(), scala_ver.to_string(), version))
-}
-
-async fn get_latest_version(group_id: &str, artifact_id: &str) -> anyhow::Result<String> {
-    let client = reqwest::Client::new();
-    let json: serde_json::Value = client
-        .get("https://search.maven.org/solrsearch/select")
-        .header("User-Agent", "sinter/0.1.0")
-        .query(&[
-            ("q", format!("g:{} AND a:{}", group_id, artifact_id)),
-            ("rows", "1".to_string()),
-            ("wt", "json".to_string()),
-        ])
-        .send()
-        .await?
-        .json()
-        .await?;
-    if let Some(docs) = json["response"]["docs"].as_array() {
-        if let Some(first) = docs.first() {
-            if let Some(v) = first["latestVersion"].as_str() {
-                return Ok(v.to_string());
-            }
-        }
-    }
-    anyhow::bail!("No version found for {}:{}", group_id, artifact_id);
+    Ok((full_artifact, scala_ver.to_string(), version.to_string()))
 }
