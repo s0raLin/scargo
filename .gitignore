@@ -10,6 +10,7 @@
 **/.bsp/
 **/target/
 **/build/
+!crates/sinter-core/src/build/
 *.log
 *.mv.db
 # Large binary files
