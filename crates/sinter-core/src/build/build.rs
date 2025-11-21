@@ -4,7 +4,7 @@ use tokio::process::Command;
 use tokio::fs;
 use std::path::Path;
 
-pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &str, target_dir: &str, backend: &str, workspace_root: Option<&Path>) -> anyhow::Result<()> {
+pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &str, target_dir: &str, backend: &str, workspace_root: Option<&Path>, setup_bsp_flag: bool, is_workspace_build: bool) -> anyhow::Result<()> {
     let source_path = proj_dir.join(source_dir);
     let target_path = if let Some(ws_root) = workspace_root {
         ws_root.join(target_dir)
@@ -16,14 +16,25 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
     // Ensure target directory exists
     fs::create_dir_all(&target_path).await?;
 
-    // Setup BSP for IDE support
-    setup_bsp(proj_dir, deps, source_dir, backend, workspace_root).await?;
+    // Setup BSP for IDE support if requested
+    if setup_bsp_flag {
+        let bsp_dir = workspace_root.unwrap_or(proj_dir);
+        let source_dirs = if let Some(ws_root) = workspace_root {
+            let member_name = proj_dir.strip_prefix(ws_root).unwrap().to_str().unwrap();
+            vec![(member_name.to_string(), source_dir.to_string())]
+        } else {
+            vec![("".to_string(), source_dir.to_string())]
+        };
+        setup_bsp(bsp_dir, deps, &source_dirs, backend).await?;
+    }
 
     let mut cmd = match backend {
         "scala-cli" => {
             let mut cmd = Command::new("scala-cli");
             cmd.arg("compile");
-            cmd.arg("--workspace").arg(workspace_dir);
+            if is_workspace_build {
+                cmd.arg("--workspace").arg(workspace_dir);
+            }
             cmd.arg("-d").arg(&target_path).arg(&source_path);
             for dep in deps {
                 cmd.arg("--dependency").arg(dep.coord());
@@ -74,24 +85,21 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
     Ok(())
 }
 
-pub async fn setup_bsp(proj_dir: &Path, deps: &[Dependency], source_dir: &str, backend: &str, workspace_root: Option<&std::path::Path>) -> anyhow::Result<()> {
-    let bsp_dir = workspace_root.unwrap_or(proj_dir);
-    let source_dir_rel = if let Some(ws_root) = workspace_root {
-        let member_name = proj_dir.strip_prefix(ws_root).unwrap().to_str().unwrap();
-        format!("{}/{}", member_name, source_dir)
-    } else {
-        source_dir.to_string()
-    };
+pub async fn setup_bsp(bsp_dir: &Path, deps: &[Dependency], source_dirs: &[(String, String)], backend: &str) -> anyhow::Result<()> {
+    // Remove any existing .bsp and .scala-build in the bsp_dir.
+    let _ = fs::remove_dir_all(bsp_dir.join(".bsp")).await;
+    let _ = fs::remove_dir_all(bsp_dir.join(".scala-build")).await;
 
-    // If in workspace, remove any existing .bsp and .scala-build in the project dir.
-    if workspace_root.is_some() {
-        let _ = fs::remove_dir_all(proj_dir.join(".bsp")).await;
-        let _ = fs::remove_dir_all(proj_dir.join(".scala-build")).await;
+    // Clean source trees
+    for (member_name, source_dir) in source_dirs {
+        let source_path = if member_name.is_empty() {
+            bsp_dir.join(source_dir)
+        } else {
+            bsp_dir.join(member_name).join(source_dir)
+        };
+        let _ = fs::remove_dir_all(source_path.join(".bsp")).await;
+        let _ = fs::remove_dir_all(source_path.join(".scala-build")).await;
     }
-    // Regardless of workspace mode, ensure the source tree stays clean.
-    let source_path = proj_dir.join(source_dir);
-    let _ = fs::remove_dir_all(source_path.join(".bsp")).await;
-    let _ = fs::remove_dir_all(source_path.join(".scala-build")).await;
 
     let mut cmd = match backend {
         "scala-cli" => {
@@ -122,9 +130,16 @@ pub async fn setup_bsp(proj_dir: &Path, deps: &[Dependency], source_dir: &str, b
     let options_path = bsp_dir.join(".scala-build/ide-options-v2.json");
     fs::create_dir_all(options_path.parent().unwrap()).await?;
     let dependencies: Vec<String> = deps.iter().map(|d| d.coord()).collect();
-    let scalac_option = format!("{}/**/*.scala", source_dir_rel);
+    let scalac_options: Vec<String> = source_dirs.iter().map(|(member_name, source_dir)| {
+        let source_dir_rel = if member_name.is_empty() {
+            source_dir.clone()
+        } else {
+            format!("{}/{}", member_name, source_dir)
+        };
+        format!("{}/**/*.scala", source_dir_rel)
+    }).collect();
     let template = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/ide-options-v2.json.template"));
-    let json_str = template.replace("{scalac_option}", &scalac_option);
+    let json_str = template.replace("{scalac_option}", &scalac_options.join("\",\""));
     let mut options: serde_json::Value = serde_json::from_str(&json_str)?;
     options["dependencies"]["dependency"] = serde_json::Value::Array(dependencies.into_iter().map(serde_json::Value::String).collect());
     let content = options.to_string();
