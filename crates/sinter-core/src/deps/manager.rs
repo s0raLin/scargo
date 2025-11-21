@@ -20,6 +20,9 @@ pub trait DependencyManager {
 
     /// 获取传递依赖（包括直接依赖和所有传递依赖）
     async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>>;
+
+    /// 设置项目目录（用于解析相对路径）
+    fn set_project_dir(&mut self, project_dir: &Path);
 }
 
 /// 获取打包的coursier可执行文件路径
@@ -114,7 +117,21 @@ pub async fn check_coursier_available() -> bool {
 }
 
 /// Coursier 依赖管理器
-pub struct CoursierDependencyManager;
+pub struct CoursierDependencyManager {
+    project_dir: Option<std::path::PathBuf>,
+}
+
+impl CoursierDependencyManager {
+    pub fn new() -> Self {
+        Self { project_dir: None }
+    }
+}
+
+impl CoursierDependencyManager {
+    fn set_project_dir(&mut self, project_dir: &Path) {
+        self.project_dir = Some(project_dir.to_path_buf());
+    }
+}
 
 #[async_trait::async_trait]
 impl DependencyManager for CoursierDependencyManager {
@@ -291,13 +308,33 @@ impl DependencyManager for CoursierDependencyManager {
                     }
                 }
                 Dependency::Sbt { path } => {
-                    // 对于sbt依赖，我们无法解析传递依赖，所以只包含本身
-                    all_deps.push(dep.clone());
+                    // 解析 sbt 项目的依赖
+                    // 路径是相对于项目目录的父目录（workspace根目录）
+                    let sbt_project_path = if let Some(project_dir) = &self.project_dir {
+                        project_dir.parent().unwrap_or(project_dir).join(path)
+                    } else {
+                        Path::new(path).to_path_buf()
+                    };
+
+                    match resolve_sbt_dependencies(&sbt_project_path).await {
+                        Ok(sbt_deps) => {
+                            all_deps.extend(sbt_deps);
+                        }
+                        Err(e) => {
+                            eprintln!("Warning: Failed to resolve sbt dependencies for {}: {}", path, e);
+                            // 如果解析失败，至少包含 sbt 依赖本身
+                            all_deps.push(dep.clone());
+                        }
+                    }
                 }
             }
         }
 
         Ok(all_deps)
+    }
+
+    fn set_project_dir(&mut self, project_dir: &Path) {
+        self.project_dir = Some(project_dir.to_path_buf());
     }
 }
 
@@ -462,9 +499,24 @@ impl DependencyManager for ScalaCliDependencyManager {
                             }
                         }
                     }
-                    Dependency::Sbt { .. } => {
-                        // 对于sbt依赖，无法解析传递依赖
-                        all_deps.push(dep.clone());
+                    Dependency::Sbt { path } => {
+                        // 尝试使用 coursier 解析 sbt 依赖
+                        if let Some(coursier_path) = get_coursier_path().await {
+                            // 路径是相对于项目目录的，但 ScalaCliDependencyManager 没有项目目录
+                            // 暂时使用相对路径
+                            match resolve_sbt_dependencies(Path::new(path)).await {
+                                Ok(sbt_deps) => {
+                                    all_deps.extend(sbt_deps);
+                                }
+                                Err(e) => {
+                                    eprintln!("Warning: Failed to resolve sbt dependencies for {}: {}", path, e);
+                                    all_deps.push(dep.clone());
+                                }
+                            }
+                        } else {
+                            // 如果 coursier 不可用，返回 sbt 依赖本身
+                            all_deps.push(dep.clone());
+                        }
                     }
                 }
             }
@@ -475,16 +527,158 @@ impl DependencyManager for ScalaCliDependencyManager {
             Ok(deps.to_vec())
         }
     }
+
+    fn set_project_dir(&mut self, _project_dir: &Path) {
+        // ScalaCliDependencyManager 不需要项目目录
+    }
 }
 
 /// 获取默认的依赖管理器
 /// 优先使用coursier（如果可用），否则回退到ScalaCliDependencyManager
 pub async fn default_dependency_manager() -> Box<dyn DependencyManager + Send + Sync> {
     if check_coursier_available().await {
-        Box::new(CoursierDependencyManager)
+        Box::new(CoursierDependencyManager::new())
     } else {
         Box::new(ScalaCliDependencyManager)
     }
+}
+
+/// 解析 sbt 项目的依赖
+/// 尝试使用多种方法来解析 sbt build.sbt 中的依赖
+pub async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result<Vec<Dependency>> {
+    // 检查 build.sbt 文件是否存在
+    let build_sbt_path = sbt_project_path.join("build.sbt");
+    if !build_sbt_path.exists() {
+        return Ok(vec![]);
+    }
+
+    // 方法1：尝试使用 coursier 解析 sbt 项目
+    if let Some(coursier_path) = get_coursier_path().await {
+        // 对于本地 sbt 项目，我们可以尝试使用 coursier 的 sbt 导出功能
+        // 首先检查是否有 build.sbt 文件
+        let build_sbt_path = sbt_project_path.join("build.sbt");
+        if !build_sbt_path.exists() {
+            eprintln!("Debug: build.sbt not found at {}", build_sbt_path.display());
+            return Ok(vec![]);
+        }
+
+        // 尝试使用 sbt export 命令，如果 sbt 可用
+        if check_command_available("sbt").await {
+            return resolve_sbt_dependencies_via_sbt(sbt_project_path).await;
+        }
+
+        // 回退到 coursier，但这可能不工作
+        let coord = format!("sbt-project:{}", sbt_project_path.display());
+        let mut cmd = Command::new(&coursier_path);
+        cmd.arg("resolve")
+            .arg("--quiet")
+            .arg("--print-tree=false")
+            .arg("--intransitive")
+            .arg(&coord);
+
+        let output = cmd.output().await?;
+        if output.status.success() {
+            let mut deps = Vec::new();
+            let mut processed_coords = std::collections::HashSet::new();
+
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 3 {
+                    let group = parts[0];
+                    let artifact = parts[1];
+                    let version = parts[2];
+                    let coord = format!("{}:{}:{}", group, artifact, version);
+
+                    if !processed_coords.contains(&coord) {
+                        let is_scala = artifact.ends_with("_2.13") || artifact.ends_with("_2.12") || artifact.ends_with("_3");
+
+                        deps.push(Dependency::Maven {
+                            group: group.to_string(),
+                            artifact: artifact.to_string(),
+                            version: version.to_string(),
+                            is_scala,
+                        });
+                        processed_coords.insert(coord);
+                    }
+                }
+            }
+            return Ok(deps);
+        }
+    }
+
+    // 如果所有方法都失败，返回空列表
+    eprintln!("Warning: Could not resolve dependencies for sbt project {}", sbt_project_path.display());
+    Ok(vec![])
+}
+
+/// 使用 sbt 命令解析依赖
+async fn resolve_sbt_dependencies_via_sbt(sbt_project_path: &Path) -> anyhow::Result<Vec<Dependency>> {
+    // 使用 sbt dependencyTree 命令获取依赖树
+    let mut cmd = Command::new("sbt");
+    cmd.arg("dependencyTree")
+        .current_dir(sbt_project_path);
+
+    let output = cmd.output().await?;
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        eprintln!("Warning: Failed to run sbt dependencyTree: {}", err);
+        return Ok(vec![]);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut deps = Vec::new();
+    let mut processed_coords = std::collections::HashSet::new();
+
+    // 解析 sbt dependencyTree 输出
+    // 输出格式类似：[info] +-org.scalatest:scalatest_2.13:3.2.17
+    // 或：[info]   +-com.typesafe:config:1.4.3
+    for line in stdout.lines() {
+        let line = line.trim();
+
+        // 剥离 [info] 前缀
+        let line = if line.starts_with("[info]") {
+            line.trim_start_matches("[info]").trim()
+        } else {
+            line
+        };
+
+        if line.starts_with("+-") || line.starts_with("  +-") {
+            let dep_line = if line.starts_with("+-") {
+                line.trim_start_matches("+-").trim()
+            } else if line.starts_with("  +-") {
+                line.trim_start_matches("  +-").trim()
+            } else {
+                continue;
+            };
+            let parts: Vec<&str> = dep_line.split(':').collect();
+            if parts.len() >= 3 {
+                let group = parts[0];
+                let artifact = parts[1];
+                let version = parts[2];
+                let coord = format!("{}:{}:{}", group, artifact, version);
+
+                if !processed_coords.contains(&coord) {
+                    let is_scala = artifact.contains("_2.13") || artifact.contains("_2.12") || artifact.contains("_3");
+
+                    deps.push(Dependency::Maven {
+                        group: group.to_string(),
+                        artifact: artifact.to_string(),
+                        version: version.to_string(),
+                        is_scala,
+                    });
+                    processed_coords.insert(coord);
+                }
+            }
+        }
+    }
+
+    Ok(deps)
 }
 
 /// 同步版本的默认依赖管理器（用于不需要异步的场景）
@@ -493,7 +687,7 @@ pub fn default_dependency_manager_sync() -> Box<dyn DependencyManager + Send + S
     // 使用tokio runtime来检查命令
     let rt = tokio::runtime::Runtime::new().unwrap();
     if rt.block_on(check_command_available("coursier")) {
-        Box::new(CoursierDependencyManager)
+        Box::new(CoursierDependencyManager::new())
     } else {
         Box::new(ScalaCliDependencyManager)
     }
