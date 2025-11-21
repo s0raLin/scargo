@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use config::Config;
@@ -144,6 +144,71 @@ pub fn get_dependencies_with_workspace(project: &Project, workspace_root: Option
     }
 
     deps
+}
+
+pub async fn get_transitive_dependencies_with_workspace(project: &Project, workspace_root: Option<&Project>) -> anyhow::Result<Vec<Dependency>> {
+    let direct_deps = get_dependencies_with_workspace(project, workspace_root);
+    let dep_manager = crate::deps::default_dependency_manager().await;
+    dep_manager.get_transitive_dependencies(&direct_deps).await
+}
+
+pub async fn generate_ide_classpath(project: &Project, workspace_root: Option<&Project>, project_dir: &Path) -> anyhow::Result<()> {
+    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root).await?;
+
+    let dep_manager = crate::deps::default_dependency_manager().await;
+    let target_dir = project_dir.join(&project.package.target_dir);
+    dep_manager.prepare_dependencies(&transitive_deps, &target_dir).await?;
+
+    // 获取依赖JAR文件的路径
+    let mut classpath_entries = String::new();
+    for dep in &transitive_deps {
+        if let Dependency::Maven { group, artifact, version } = dep {
+            // coursier通常将JAR文件存储在~/.coursier/cache/v1/https/repo1.maven.org/maven2/...
+            // 我们需要找到实际的JAR文件路径
+            if let Some(jar_path) = find_jar_path(group, artifact, version) {
+                classpath_entries.push_str(&format!("\t<classpathentry kind=\"lib\" path=\"{}\"/>\n", jar_path.display()));
+            }
+        }
+    }
+
+    // 读取模板
+    let template_path = Path::new("templates/.classpath.template");
+    let template_content = std::fs::read_to_string(template_path)?;
+
+    // 替换模板变量
+    let classpath_content = template_content
+        .replace("{source_dir}", &project.package.source_dir)
+        .replace("{target_dir}", &project.package.target_dir)
+        .replace("{classpath_entries}", &classpath_entries);
+
+    // 写入.classpath文件
+    let classpath_path = project_dir.join(".classpath");
+    std::fs::write(classpath_path, classpath_content)?;
+
+    Ok(())
+}
+
+fn find_jar_path(group: &str, artifact: &str, version: &str) -> Option<PathBuf> {
+    // 尝试常见的coursier缓存位置
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let cache_base = PathBuf::from(home).join(".coursier").join("cache").join("v1");
+
+    // Maven Central路径
+    let maven_path = cache_base
+        .join("https")
+        .join("repo1.maven.org")
+        .join("maven2")
+        .join(group.replace(".", "/"))
+        .join(artifact)
+        .join(version)
+        .join(format!("{}-{}.jar", artifact, version));
+
+    if maven_path.exists() {
+        Some(maven_path)
+    } else {
+        // 尝试其他仓库或返回None
+        None
+    }
 }
 
 pub fn get_main_file_path(project: &Project) -> std::path::PathBuf {

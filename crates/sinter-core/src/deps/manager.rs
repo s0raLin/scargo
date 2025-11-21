@@ -17,6 +17,9 @@ pub trait DependencyManager {
 
     /// 验证依赖是否可用（用于添加依赖时）
     async fn validate_dependency(&self, dep: &Dependency) -> anyhow::Result<()>;
+
+    /// 获取传递依赖（包括直接依赖和所有传递依赖）
+    async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>>;
 }
 
 /// 获取打包的coursier可执行文件路径
@@ -186,23 +189,23 @@ impl DependencyManager for CoursierDependencyManager {
         // 获取coursier路径（优先使用打包的版本）
         let coursier_path = get_coursier_path().await
             .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
-        
+
         match dep {
             Dependency::Maven { group, artifact, version } => {
                 let coord = format!("{}:{}:{}", group, artifact, version);
-                
+
                 // 使用coursier resolve验证依赖是否存在
                 let mut cmd = Command::new(&coursier_path);
                 cmd.arg("resolve")
                     .arg("--quiet")
                     .arg(&coord);
-                
+
                 let output = cmd.output().await?;
                 if !output.status.success() {
                     let err = String::from_utf8_lossy(&output.stderr);
                     anyhow::bail!("Dependency {} is not available: {}", coord, err);
                 }
-                
+
                 Ok(())
             }
             Dependency::Sbt { path } => {
@@ -213,6 +216,75 @@ impl DependencyManager for CoursierDependencyManager {
                 Ok(())
             }
         }
+    }
+
+    async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>> {
+        let coursier_path = get_coursier_path().await
+            .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
+
+        let mut all_deps = Vec::new();
+        let mut processed_coords = std::collections::HashSet::new();
+
+        for dep in deps {
+            match dep {
+                Dependency::Maven { group, artifact, version } => {
+                    let coord = format!("{}:{}:{}", group, artifact, version);
+
+                    // 使用coursier resolve获取传递依赖
+                    let mut cmd = Command::new(&coursier_path);
+                    cmd.arg("resolve")
+                        .arg("--quiet")
+                        .arg("--print-tree=false")
+                        .arg("--intransitive")  // 获取所有传递依赖
+                        .arg(&coord);
+
+                    let output = cmd.output().await?;
+                    if !output.status.success() {
+                        let err = String::from_utf8_lossy(&output.stderr);
+                        eprintln!("Warning: Failed to resolve transitive dependencies for {}: {}", coord, err);
+                        // 如果解析失败，至少包含原始依赖
+                        if !processed_coords.contains(&coord) {
+                            all_deps.push(dep.clone());
+                            processed_coords.insert(coord);
+                        }
+                        continue;
+                    }
+
+                    // 解析输出，coursier resolve输出格式为每行一个坐标
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        let line = line.trim();
+                        if line.is_empty() || line.starts_with('#') {
+                            continue;
+                        }
+
+                        // 解析Maven坐标格式 group:artifact:version
+                        let parts: Vec<&str> = line.split(':').collect();
+                        if parts.len() >= 3 {
+                            let group = parts[0];
+                            let artifact = parts[1];
+                            let version = parts[2];
+                            let coord = format!("{}:{}:{}", group, artifact, version);
+
+                            if !processed_coords.contains(&coord) {
+                                all_deps.push(Dependency::Maven {
+                                    group: group.to_string(),
+                                    artifact: artifact.to_string(),
+                                    version: version.to_string(),
+                                });
+                                processed_coords.insert(coord);
+                            }
+                        }
+                    }
+                }
+                Dependency::Sbt { path } => {
+                    // 对于sbt依赖，我们无法解析传递依赖，所以只包含本身
+                    all_deps.push(dep.clone());
+                }
+            }
+        }
+
+        Ok(all_deps)
     }
 }
 
@@ -283,7 +355,7 @@ impl DependencyManager for ScalaCliDependencyManager {
         match dep {
             Dependency::Maven { group, artifact, version } => {
                 let coord = format!("{}:{}:{}", group, artifact, version);
-                
+
                 // 使用scala-cli来验证依赖（通过尝试编译一个简单的程序）
                 // 这样可以确保依赖可以被正确解析和下载
                 let mut cmd = Command::new("scala-cli");
@@ -292,13 +364,13 @@ impl DependencyManager for ScalaCliDependencyManager {
                     .arg("--quiet")
                     .arg("-e")
                     .arg("println(\"test\")");
-                
+
                 let output = cmd.output().await?;
                 if !output.status.success() {
                     let err = String::from_utf8_lossy(&output.stderr);
                     anyhow::bail!("Dependency {} is not available: {}", coord, err);
                 }
-                
+
                 Ok(())
             }
             Dependency::Sbt { path } => {
@@ -308,6 +380,77 @@ impl DependencyManager for ScalaCliDependencyManager {
                 }
                 Ok(())
             }
+        }
+    }
+
+    async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>> {
+        // Scala CLI没有直接的传递依赖解析功能
+        // 我们尝试使用coursier作为后备，如果不可用则返回直接依赖
+
+        if let Some(coursier_path) = get_coursier_path().await {
+            let mut all_deps = Vec::new();
+            let mut processed_coords = std::collections::HashSet::new();
+
+            for dep in deps {
+                match dep {
+                    Dependency::Maven { group, artifact, version } => {
+                        let coord = format!("{}:{}:{}", group, artifact, version);
+
+                        // 使用coursier resolve获取传递依赖
+                        let mut cmd = Command::new(&coursier_path);
+                        cmd.arg("resolve")
+                            .arg("--quiet")
+                            .arg("--print-tree=false")
+                            .arg("--intransitive")
+                            .arg(&coord);
+
+                        let output = cmd.output().await?;
+                        if !output.status.success() {
+                            // 如果coursier解析失败，至少包含原始依赖
+                            if !processed_coords.contains(&coord) {
+                                all_deps.push(dep.clone());
+                                processed_coords.insert(coord);
+                            }
+                            continue;
+                        }
+
+                        // 解析输出
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        for line in stdout.lines() {
+                            let line = line.trim();
+                            if line.is_empty() || line.starts_with('#') {
+                                continue;
+                            }
+
+                            let parts: Vec<&str> = line.split(':').collect();
+                            if parts.len() >= 3 {
+                                let group = parts[0];
+                                let artifact = parts[1];
+                                let version = parts[2];
+                                let coord = format!("{}:{}:{}", group, artifact, version);
+
+                                if !processed_coords.contains(&coord) {
+                                    all_deps.push(Dependency::Maven {
+                                        group: group.to_string(),
+                                        artifact: artifact.to_string(),
+                                        version: version.to_string(),
+                                    });
+                                    processed_coords.insert(coord);
+                                }
+                            }
+                        }
+                    }
+                    Dependency::Sbt { .. } => {
+                        // 对于sbt依赖，无法解析传递依赖
+                        all_deps.push(dep.clone());
+                    }
+                }
+            }
+
+            Ok(all_deps)
+        } else {
+            // 如果coursier不可用，返回直接依赖
+            Ok(deps.to_vec())
         }
     }
 }
