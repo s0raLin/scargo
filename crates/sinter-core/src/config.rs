@@ -146,14 +146,15 @@ pub fn get_dependencies_with_workspace(project: &Project, workspace_root: Option
     deps
 }
 
-pub async fn get_transitive_dependencies_with_workspace(project: &Project, workspace_root: Option<&Project>) -> anyhow::Result<Vec<Dependency>> {
+pub async fn get_transitive_dependencies_with_workspace(project: &Project, workspace_root: Option<&Project>, project_dir: &Path) -> anyhow::Result<Vec<Dependency>> {
     let direct_deps = get_dependencies_with_workspace(project, workspace_root);
-    let dep_manager = crate::deps::default_dependency_manager().await;
+    let mut dep_manager = crate::deps::default_dependency_manager().await;
+    dep_manager.set_project_dir(project_dir);
     dep_manager.get_transitive_dependencies(&direct_deps).await
 }
 
 pub async fn generate_ide_classpath(project: &Project, workspace_root: Option<&Project>, project_dir: &Path) -> anyhow::Result<()> {
-    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root).await?;
+    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root, project_dir).await?;
 
     let dep_manager = crate::deps::default_dependency_manager().await;
     let target_dir = project_dir.join(&project.package.target_dir);
@@ -189,7 +190,7 @@ pub async fn generate_ide_classpath(project: &Project, workspace_root: Option<&P
 }
 
 pub async fn generate_ide_options_v2(project: &Project, workspace_root: Option<&Project>, project_dir: &Path) -> anyhow::Result<()> {
-    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root).await?;
+    let transitive_deps = get_transitive_dependencies_with_workspace(project, workspace_root, project_dir).await?;
 
     let dep_manager = crate::deps::default_dependency_manager().await;
     let target_dir = project_dir.join(&project.package.target_dir);

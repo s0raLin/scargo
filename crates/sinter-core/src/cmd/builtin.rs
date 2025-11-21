@@ -68,7 +68,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
         let (root_project, members) = crate::config::load_workspace(&workspace_root)?.unwrap();
         for member in members {
             let member_dir = workspace_root.join(&member.package.name);
-            let deps = crate::config::get_dependencies_with_workspace(&member, Some(&root_project));
+            let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), &member_dir).await?;
             // For workspace builds, use target directory relative to workspace root
             let workspace_target_dir = format!(
                 "{}/{}",
@@ -76,7 +76,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
             );
             crate::build::build::build_with_deps(
                 &member_dir,
-                &deps,
+                &transitive_deps,
                 &member.package.source_dir,
                 &workspace_target_dir,
                 &member.package.backend,
@@ -89,10 +89,10 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
     } else {
         // Single project build
         let project = crate::config::load_project(cwd)?;
-        let deps = crate::config::get_dependencies(&project);
+        let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
         crate::build::build::build_with_deps(
             cwd,
-            &deps,
+            &transitive_deps,
             &project.package.source_dir,
             &project.package.target_dir,
             &project.package.backend,
@@ -101,7 +101,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
         .await?;
         println!(
             "{}",
-            crate::i18n::tf("build_succeeded_with_deps", &[&deps.len().to_string()])
+            crate::i18n::tf("build_succeeded_with_deps", &[&transitive_deps.len().to_string()])
         );
     }
     Ok(())

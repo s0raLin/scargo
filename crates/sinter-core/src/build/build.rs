@@ -32,8 +32,13 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
         }
         "sbt" => {
             // For sbt, we assume build.sbt exists and contains dependencies
+            // 如果有外部依赖（比如从其他项目导入的），可能需要特殊处理
             let mut cmd = Command::new("sbt");
             cmd.arg("compile");
+
+            // 对于传递的依赖，如果是 Maven 依赖，我们可以尝试通过系统属性传递
+            // 但 sbt 通常期望依赖在 build.sbt 中定义
+            // 这里我们主要依赖 sbt 自己的依赖管理
             cmd
         }
         "gradle" => {
