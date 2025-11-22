@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::WorkspaceCommands;
+use crate::cli::WorkspaceCommands;
 
 pub async fn cmd_workspace(cwd: &PathBuf, subcommand: &WorkspaceCommands) -> anyhow::Result<()> {
     match subcommand {

@@ -2,8 +2,7 @@
 //!
 //! 包含所有内置命令的执行逻辑
 
-use crate::Commands;
-use crate::cmd::{cmd_new, cmd_init, cmd_test, cmd_workspace};
+use crate::cli::{Commands, commands::{cmd_new, cmd_init, cmd_test, cmd_workspace}};
 use crate::build::{run_scala_file, run_single_file_with_deps, setup_bsp};
 use crate::deps::add_dependency;
 use std::path::PathBuf;
@@ -32,9 +31,9 @@ pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result
         Commands::Test { file } => {
             cmd_test(cwd, file).await?;
         }
-        Commands::Jsp { .. } => {
+        Commands::Jsp { name } => {
             // JSP 命令应该由插件系统处理
-            unreachable!("JSP command should be handled by plugin system");
+            anyhow::bail!("JSP command '{}' requires the JSP plugin to be loaded", name);
         }
     }
     Ok(())
@@ -83,7 +82,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                     "{}/{}",
                     root_project.package.target_dir, member.package.name
                 );
-                crate::build::build::build_with_deps(
+                crate::build::build_with_deps(
                     &member_dir,
                     &transitive_deps,
                     &member.package.source_dir,
@@ -109,7 +108,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                 let member_name = cwd.strip_prefix(&workspace_root).unwrap().components().next().unwrap().as_os_str().to_str().unwrap();
                 if let Some(member) = members.into_iter().find(|m| m.package.name == member_name) {
                     let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), cwd).await?;
-                    crate::build::build::build_with_deps(
+                    crate::build::build_with_deps(
                         cwd,
                         &transitive_deps,
                         &member.package.source_dir,
@@ -130,7 +129,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
             } else {
                 // Single project build
                 let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
-                crate::build::build::build_with_deps(
+                crate::build::build_with_deps(
                     cwd,
                     &transitive_deps,
                     &project.package.source_dir,
@@ -238,4 +237,3 @@ async fn execute_add(cwd: &PathBuf, deps: &[String]) -> anyhow::Result<()> {
     }
     Ok(())
 }
-

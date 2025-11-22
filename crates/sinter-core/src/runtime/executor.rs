@@ -3,8 +3,7 @@
 //! 负责将解析后的 CLI 命令分发到对应的处理器
 
 use crate::core::handler::CommandHandler;
-use crate::cli::Cli;
-use crate::cmd::builtin;
+use crate::cli::{Cli, builtin};
 use std::path::PathBuf;
 
 /// 命令执行器

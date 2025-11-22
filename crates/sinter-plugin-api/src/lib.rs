@@ -42,7 +42,7 @@ pub use sinter::CommandHandler;
 // 重新导出常用类型，方便插件开发
 pub use clap::{Arg, ArgMatches, Command};
 pub use std::path::PathBuf;
-pub use anyhow::Result as AnyhowResult;
+pub use anyhow::{Result as AnyhowResult, anyhow, bail};
 pub use async_trait::async_trait;
 
 // 重新导出 tokio 的常用功能

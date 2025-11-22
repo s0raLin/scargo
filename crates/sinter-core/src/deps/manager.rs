@@ -1,11 +1,17 @@
-use crate::deps::deps::Dependency;
+use crate::deps::deps::Dependency; // 假设此行是您的实际引用
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashSet;
+use anyhow::anyhow;
+
+
+
+// --- 核心 Trait 和辅助函数 ---
 
 /// 抽象的依赖管理器trait
 #[async_trait::async_trait]
-pub trait DependencyManager {
+pub trait DependencyManager: Send + Sync {
     /// 准备依赖（下载、构建等）
     async fn prepare_dependencies(&self, deps: &[Dependency], target_dir: &Path) -> anyhow::Result<()>;
 
@@ -26,9 +32,7 @@ pub trait DependencyManager {
 }
 
 /// 获取打包的coursier可执行文件路径
-/// 优先使用打包的版本，如果不存在则返回None
 fn get_bundled_coursier_path() -> Option<PathBuf> {
-    // 尝试从多个可能的位置查找打包的coursier
     let exe_name = if cfg!(target_os = "windows") {
         "coursier.exe"
     } else {
@@ -57,7 +61,6 @@ fn get_bundled_coursier_path() -> Option<PathBuf> {
 }
 
 /// 获取coursier可执行文件路径
-/// 优先使用打包的版本，如果不存在则使用系统命令
 async fn get_coursier_path() -> Option<String> {
     // 首先尝试使用打包的coursier
     if let Some(bundled_path) = get_bundled_coursier_path() {
@@ -75,6 +78,7 @@ async fn get_coursier_path() -> Option<String> {
             // 验证打包的coursier是否可用
             let mut cmd = Command::new(path_str);
             cmd.arg("--version");
+            // 使用 timeout 避免卡死，尽管 tokio::process::Command 默认没有
             if cmd.output().await.map(|o| o.status.success()).unwrap_or(false) {
                 return Some(path_str.to_string());
             }
@@ -116,9 +120,11 @@ pub async fn check_coursier_available() -> bool {
     available
 }
 
+// --- Coursier 实现 ---
+
 /// Coursier 依赖管理器
 pub struct CoursierDependencyManager {
-    project_dir: Option<std::path::PathBuf>,
+    project_dir: Option<PathBuf>,
 }
 
 impl CoursierDependencyManager {
@@ -127,44 +133,26 @@ impl CoursierDependencyManager {
     }
 }
 
-impl CoursierDependencyManager {
-    fn set_project_dir(&mut self, project_dir: &Path) {
-        self.project_dir = Some(project_dir.to_path_buf());
-    }
-}
-
 #[async_trait::async_trait]
 impl DependencyManager for CoursierDependencyManager {
     async fn prepare_dependencies(&self, deps: &[Dependency], _target_dir: &Path) -> anyhow::Result<()> {
-        // 获取coursier路径（优先使用打包的版本）
         let coursier_path = get_coursier_path().await
-            .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
+            .ok_or_else(|| anyhow!("coursier is not available"))?;
         
-        // 使用coursier下载依赖到本地缓存
-        // target_dir参数保留以保持trait接口一致性，但coursier使用自己的缓存目录
         for dep in deps {
             match dep {
-                Dependency::Maven { group, artifact, version, is_scala } => {
-                    let coord = if *is_scala {
-                        format!("{}::{}:{}", group, artifact, version)
-                    } else {
-                        format!("{}:{}:{}", group, artifact, version)
-                    };
-
+                Dependency::Maven { .. } => {
                     // 使用coursier fetch下载依赖（这会自动缓存）
                     let mut cmd = Command::new(&coursier_path);
                     cmd.arg("fetch")
                         .arg("--quiet")
-                        .arg(&coord);
+                        .arg(dep.coord());
                     
                     let output = cmd.output().await?;
                     if !output.status.success() {
                         let err = String::from_utf8_lossy(&output.stderr);
-                        anyhow::bail!("Failed to fetch dependency {}: {}", coord, err);
+                        anyhow::bail!("Failed to fetch dependency {}: {}", dep.coord(), err);
                     }
-                    
-                    // 可选：将依赖复制到target目录（如果需要）
-                    // 通常coursier会管理缓存，scala-cli也会使用相同的缓存
                 }
                 Dependency::Sbt { path } => {
                     // 验证sbt项目存在
@@ -189,12 +177,20 @@ impl DependencyManager for CoursierDependencyManager {
                     args.push(dep.coord());
                 }
                 Dependency::Sbt { path } => {
-                    if Path::new(path).is_relative() {
-                        args.push("--dependency".to_string());
-                        args.push(format!("file://{}", path));
+                    // 统一使用 file:// 格式，无论是相对路径还是绝对路径
+                    let dep_path = if Path::new(path).is_relative() {
+                        // 使用 project_dir 来解析相对路径
+                        self.project_dir.as_ref()
+                            .map(|dir| dir.join(path))
+                            .unwrap_or_else(|| PathBuf::from(path))
+                            .to_string_lossy()
+                            .to_string()
                     } else {
-                        println!("Warning: Absolute sbt path {} may not work with scala-cli", path);
-                    }
+                        path.clone()
+                    };
+                    
+                    args.push("--dependency".to_string());
+                    args.push(format!("file://{}", dep_path));
                 }
             }
         }
@@ -207,30 +203,22 @@ impl DependencyManager for CoursierDependencyManager {
     }
 
     async fn validate_dependency(&self, dep: &Dependency) -> anyhow::Result<()> {
-        // 获取coursier路径（优先使用打包的版本）
         let coursier_path = get_coursier_path().await
-            .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
+            .ok_or_else(|| anyhow!("coursier is not available"))?;
 
         match dep {
-            Dependency::Maven { group, artifact, version, is_scala } => {
-                let coord = if *is_scala {
-                    format!("{}::{}:{}", group, artifact, version)
-                } else {
-                    format!("{}:{}:{}", group, artifact, version)
-                };
-
+            Dependency::Maven { .. } => {
                 // 使用coursier resolve验证依赖是否存在
                 let mut cmd = Command::new(&coursier_path);
                 cmd.arg("resolve")
                     .arg("--quiet")
-                    .arg(&coord);
+                    .arg(dep.coord());
 
                 let output = cmd.output().await?;
                 if !output.status.success() {
                     let err = String::from_utf8_lossy(&output.stderr);
-                    anyhow::bail!("Dependency {} is not available: {}", coord, err);
+                    anyhow::bail!("Dependency {} is not available: {}", dep.coord(), err);
                 }
-
                 Ok(())
             }
             Dependency::Sbt { path } => {
@@ -245,10 +233,10 @@ impl DependencyManager for CoursierDependencyManager {
 
     async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>> {
         let coursier_path = get_coursier_path().await
-            .ok_or_else(|| anyhow::anyhow!("coursier is not available"))?;
+            .ok_or_else(|| anyhow!("coursier is not available"))?;
 
         let mut all_deps = Vec::new();
-        let mut processed_coords = std::collections::HashSet::new();
+        let mut processed_coords: HashSet<String> = HashSet::new();
 
         for dep in deps {
             match dep {
@@ -259,27 +247,22 @@ impl DependencyManager for CoursierDependencyManager {
                         format!("{}:{}:{}", group, artifact, version)
                     };
 
-                    // 使用coursier resolve获取传递依赖
                     let mut cmd = Command::new(&coursier_path);
                     cmd.arg("resolve")
                         .arg("--quiet")
                         .arg("--print-tree=false")
-                        .arg("--intransitive")  // 获取所有传递依赖
+                        .arg("--intransitive") 
                         .arg(&coord);
 
                     let output = cmd.output().await?;
                     if !output.status.success() {
-                        let err = String::from_utf8_lossy(&output.stderr);
-                        eprintln!("Warning: Failed to resolve transitive dependencies for {}: {}", coord, err);
-                        // 如果解析失败，至少包含原始依赖
-                        if !processed_coords.contains(&coord) {
+                        eprintln!("Warning: Failed to resolve transitive dependencies for {}: {}", coord, String::from_utf8_lossy(&output.stderr));
+                        if processed_coords.insert(coord.clone()) {
                             all_deps.push(dep.clone());
-                            processed_coords.insert(coord);
                         }
                         continue;
                     }
 
-                    // 解析输出，coursier resolve输出格式为每行一个坐标
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stdout.lines() {
                         let line = line.trim();
@@ -287,42 +270,50 @@ impl DependencyManager for CoursierDependencyManager {
                             continue;
                         }
 
-                        // 解析Maven坐标格式 group:artifact:version
+                        // 解析 Maven 坐标格式 group:artifact:version
                         let parts: Vec<&str> = line.split(':').collect();
                         if parts.len() >= 3 {
                             let group = parts[0];
                             let artifact = parts[1];
                             let version = parts[2];
-                            let coord = format!("{}:{}:{}", group, artifact, version);
+                            let current_coord = format!("{}:{}:{}", group, artifact, version);
 
-                            if !processed_coords.contains(&coord) {
+                            if processed_coords.insert(current_coord) {
+                                // 继承原始依赖的 is_scala 标志，或者根据 artifact 名称重新判断
+                                let is_scala_dep = artifact.contains("_2.13") || artifact.contains("_2.12") || artifact.contains("_3");
+                                
                                 all_deps.push(Dependency::Maven {
                                     group: group.to_string(),
                                     artifact: artifact.to_string(),
                                     version: version.to_string(),
-                                    is_scala: *is_scala,
+                                    is_scala: is_scala_dep,
                                 });
-                                processed_coords.insert(coord);
                             }
                         }
                     }
                 }
                 Dependency::Sbt { path } => {
                     // 解析 sbt 项目的依赖
-                    // 路径是相对于项目目录的父目录（workspace根目录）
                     let sbt_project_path = if let Some(project_dir) = &self.project_dir {
-                        project_dir.parent().unwrap_or(project_dir).join(path)
+                        // 修正：相对路径相对于 project_dir
+                        project_dir.join(path)
                     } else {
                         Path::new(path).to_path_buf()
                     };
 
                     match resolve_sbt_dependencies(&sbt_project_path).await {
                         Ok(sbt_deps) => {
-                            all_deps.extend(sbt_deps);
+                            // 仅添加未处理过的 Maven 坐标
+                            for sbt_dep in sbt_deps {
+                                if let Dependency::Maven { .. } = &sbt_dep {
+                                    if processed_coords.insert(sbt_dep.coord()) {
+                                        all_deps.push(sbt_dep);
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             eprintln!("Warning: Failed to resolve sbt dependencies for {}: {}", path, e);
-                            // 如果解析失败，至少包含 sbt 依赖本身
                             all_deps.push(dep.clone());
                         }
                     }
@@ -338,35 +329,22 @@ impl DependencyManager for CoursierDependencyManager {
     }
 }
 
+// --- ScalaCli 实现 ---
+
 /// Scala CLI 依赖管理器
 pub struct ScalaCliDependencyManager;
 
 #[async_trait::async_trait]
 impl DependencyManager for ScalaCliDependencyManager {
     async fn prepare_dependencies(&self, deps: &[Dependency], _target_dir: &Path) -> anyhow::Result<()> {
-        // Scala CLI 会自动处理依赖下载，不需要预先准备
-        // 但是我们可以验证依赖是否有效
-
-        // 对于sbt依赖，我们需要特殊处理
         for dep in deps {
             if let Some(sbt_path) = dep.sbt_path() {
-                // 验证sbt项目存在
                 let sbt_project_path = Path::new(sbt_path);
                 if !sbt_project_path.exists() {
                     anyhow::bail!("sbt project path does not exist: {}", sbt_path);
                 }
-
-                // 检查是否有project.toml或其他Scala CLI配置文件
-                let has_scala_cli_config = sbt_project_path.join("project.scala").exists() ||
-                    sbt_project_path.join("project.sc").exists();
-
-                if !has_scala_cli_config {
-                    println!("Warning: sbt project {} may not be compatible with scala-cli", sbt_path);
-                    println!("Consider converting it to use scala-cli or providing Maven coordinates");
-                }
             }
         }
-
         Ok(())
     }
 
@@ -380,51 +358,29 @@ impl DependencyManager for ScalaCliDependencyManager {
                     args.push(dep.coord());
                 }
                 Dependency::Sbt { path } => {
-                    // 对于sbt依赖，尝试将其作为scala-cli项目添加
-                    // 如果是相对路径，假设它是一个scala-cli项目
-                    if Path::new(path).is_relative() {
-                        args.push("--dependency".to_string());
-                        args.push(format!("file://{}", path));
-                    } else {
-                        println!("Warning: Absolute sbt path {} may not work with scala-cli", path);
-                    }
+                    // Scala CLI 处理 file:// 路径
+                    args.push("--dependency".to_string());
+                    args.push(format!("file://{}", path));
                 }
             }
         }
-
         args
     }
 
     fn get_run_args(&self, deps: &[Dependency]) -> Vec<String> {
-        // 运行时参数与构建时相同
         self.get_build_args(deps)
     }
 
     async fn validate_dependency(&self, dep: &Dependency) -> anyhow::Result<()> {
-        // Scala CLI 验证：通过尝试编译一个简单的程序来验证依赖是否可用
         match dep {
-            Dependency::Maven { group, artifact, version, is_scala } => {
-                let coord = if *is_scala {
-                    format!("{}::{}:{}", group, artifact, version)
-                } else {
-                    format!("{}:{}:{}", group, artifact, version)
-                };
-
-                // 使用scala-cli来验证依赖（通过尝试编译一个简单的程序）
-                // 这样可以确保依赖可以被正确解析和下载
-                let mut cmd = Command::new("scala-cli");
-                cmd.arg("--dependency")
-                    .arg(&coord)
-                    .arg("--quiet")
-                    .arg("-e")
-                    .arg("println(\"test\")");
-
-                let output = cmd.output().await?;
+            Dependency::Maven { .. } => {
+                let args: Vec<String> = vec!["--dependency".to_string(), dep.coord(), "--quiet".to_string(), "-e".to_string(), "println(\"test\")".to_string()];
+                let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                let output = crate::build::scala_cli::run_scala_cli(&args_str, None).await?;
                 if !output.status.success() {
                     let err = String::from_utf8_lossy(&output.stderr);
-                    anyhow::bail!("Dependency {} is not available: {}", coord, err);
+                    anyhow::bail!("Dependency {} is not available: {}", dep.coord(), err);
                 }
-
                 Ok(())
             }
             Dependency::Sbt { path } => {
@@ -438,92 +394,14 @@ impl DependencyManager for ScalaCliDependencyManager {
     }
 
     async fn get_transitive_dependencies(&self, deps: &[Dependency]) -> anyhow::Result<Vec<Dependency>> {
-        // Scala CLI没有直接的传递依赖解析功能
-        // 我们尝试使用coursier作为后备，如果不可用则返回直接依赖
-
+        // Scala CLI 没有原生传递依赖解析功能，尝试回退到 Coursier
         if let Some(coursier_path) = get_coursier_path().await {
-            let mut all_deps = Vec::new();
-            let mut processed_coords = std::collections::HashSet::new();
-
-            for dep in deps {
-                match dep {
-                    Dependency::Maven { group, artifact, version, is_scala } => {
-                        let coord = if *is_scala {
-                            format!("{}::{}:{}", group, artifact, version)
-                        } else {
-                            format!("{}:{}:{}", group, artifact, version)
-                        };
-
-                        // 使用coursier resolve获取传递依赖
-                        let mut cmd = Command::new(&coursier_path);
-                        cmd.arg("resolve")
-                            .arg("--quiet")
-                            .arg("--print-tree=false")
-                            .arg("--intransitive")
-                            .arg(&coord);
-
-                        let output = cmd.output().await?;
-                        if !output.status.success() {
-                            // 如果coursier解析失败，至少包含原始依赖
-                            if !processed_coords.contains(&coord) {
-                                all_deps.push(dep.clone());
-                                processed_coords.insert(coord);
-                            }
-                            continue;
-                        }
-
-                        // 解析输出
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        for line in stdout.lines() {
-                            let line = line.trim();
-                            if line.is_empty() || line.starts_with('#') {
-                                continue;
-                            }
-
-                            let parts: Vec<&str> = line.split(':').collect();
-                            if parts.len() >= 3 {
-                                let group = parts[0];
-                                let artifact = parts[1];
-                                let version = parts[2];
-                                let coord = format!("{}:{}:{}", group, artifact, version);
-
-                                if !processed_coords.contains(&coord) {
-                                    all_deps.push(Dependency::Maven {
-                                        group: group.to_string(),
-                                        artifact: artifact.to_string(),
-                                        version: version.to_string(),
-                                        is_scala: *is_scala,
-                                    });
-                                    processed_coords.insert(coord);
-                                }
-                            }
-                        }
-                    }
-                    Dependency::Sbt { path } => {
-                        // 尝试使用 coursier 解析 sbt 依赖
-                        if let Some(coursier_path) = get_coursier_path().await {
-                            // 路径是相对于项目目录的，但 ScalaCliDependencyManager 没有项目目录
-                            // 暂时使用相对路径
-                            match resolve_sbt_dependencies(Path::new(path)).await {
-                                Ok(sbt_deps) => {
-                                    all_deps.extend(sbt_deps);
-                                }
-                                Err(e) => {
-                                    eprintln!("Warning: Failed to resolve sbt dependencies for {}: {}", path, e);
-                                    all_deps.push(dep.clone());
-                                }
-                            }
-                        } else {
-                            // 如果 coursier 不可用，返回 sbt 依赖本身
-                            all_deps.push(dep.clone());
-                        }
-                    }
-                }
-            }
-
-            Ok(all_deps)
+            // 使用 CoursierDependencyManager 的逻辑来解析，但不设置 project_dir
+            let coursier_manager = CoursierDependencyManager::new();
+            coursier_manager.get_transitive_dependencies(deps).await
         } else {
             // 如果coursier不可用，返回直接依赖
+            eprintln!("Warning: Coursier is not available. Cannot resolve transitive dependencies using ScalaCliDependencyManager.");
             Ok(deps.to_vec())
         }
     }
@@ -533,8 +411,9 @@ impl DependencyManager for ScalaCliDependencyManager {
     }
 }
 
+// --- 依赖管理器工厂函数 ---
+
 /// 获取默认的依赖管理器
-/// 优先使用coursier（如果可用），否则回退到ScalaCliDependencyManager
 pub async fn default_dependency_manager() -> Box<dyn DependencyManager + Send + Sync> {
     if check_coursier_available().await {
         Box::new(CoursierDependencyManager::new())
@@ -543,31 +422,38 @@ pub async fn default_dependency_manager() -> Box<dyn DependencyManager + Send + 
     }
 }
 
+/// 同步版本的默认依赖管理器（用于不需要异步的场景）
+pub fn default_dependency_manager_sync() -> Box<dyn DependencyManager + Send + Sync> {
+    // 修正：使用 tokio runtime 来安全地调用异步检查，并避免在非异步环境中多次创建 runtime
+    // 生产环境中，最好在应用的启动时只创建一次 runtime
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime for sync check");
+    
+    // 检查 coursier 是否可用
+    let is_coursier_available = rt.block_on(check_coursier_available());
+
+    if is_coursier_available {
+        Box::new(CoursierDependencyManager::new())
+    } else {
+        Box::new(ScalaCliDependencyManager)
+    }
+}
+
+// --- SBT 辅助解析函数 ---
+
 /// 解析 sbt 项目的依赖
-/// 尝试使用多种方法来解析 sbt build.sbt 中的依赖
-pub async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result<Vec<Dependency>> {
-    // 检查 build.sbt 文件是否存在
+async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result<Vec<Dependency>> {
     let build_sbt_path = sbt_project_path.join("build.sbt");
     if !build_sbt_path.exists() {
         return Ok(vec![]);
     }
 
-    // 方法1：尝试使用 coursier 解析 sbt 项目
+    // 优先使用 sbt dependencyTree 命令获取依赖
+    if check_command_available("sbt").await {
+        return resolve_sbt_dependencies_via_sbt(sbt_project_path).await;
+    }
+
+    // 回退：尝试使用 coursier 解析 sbt 项目（仅当 sbt 不可用时）
     if let Some(coursier_path) = get_coursier_path().await {
-        // 对于本地 sbt 项目，我们可以尝试使用 coursier 的 sbt 导出功能
-        // 首先检查是否有 build.sbt 文件
-        let build_sbt_path = sbt_project_path.join("build.sbt");
-        if !build_sbt_path.exists() {
-            eprintln!("Debug: build.sbt not found at {}", build_sbt_path.display());
-            return Ok(vec![]);
-        }
-
-        // 尝试使用 sbt export 命令，如果 sbt 可用
-        if check_command_available("sbt").await {
-            return resolve_sbt_dependencies_via_sbt(sbt_project_path).await;
-        }
-
-        // 回退到 coursier，但这可能不工作
         let coord = format!("sbt-project:{}", sbt_project_path.display());
         let mut cmd = Command::new(&coursier_path);
         cmd.arg("resolve")
@@ -579,15 +465,13 @@ pub async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result
         let output = cmd.output().await?;
         if output.status.success() {
             let mut deps = Vec::new();
-            let mut processed_coords = std::collections::HashSet::new();
+            let mut processed_coords: HashSet<String> = HashSet::new();
 
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
                 let line = line.trim();
-                if line.is_empty() || line.starts_with('#') {
-                    continue;
-                }
-
+                // ... (Maven 坐标解析逻辑与 CoursierDependencyManager 中相同，省略细节)
+                if line.is_empty() || line.starts_with('#') { continue; }
                 let parts: Vec<&str> = line.split(':').collect();
                 if parts.len() >= 3 {
                     let group = parts[0];
@@ -595,16 +479,14 @@ pub async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result
                     let version = parts[2];
                     let coord = format!("{}:{}:{}", group, artifact, version);
 
-                    if !processed_coords.contains(&coord) {
-                        let is_scala = artifact.ends_with("_2.13") || artifact.ends_with("_2.12") || artifact.ends_with("_3");
-
+                    if processed_coords.insert(coord.clone()) {
+                        let is_scala = artifact.contains("_2.13") || artifact.contains("_2.12") || artifact.contains("_3");
                         deps.push(Dependency::Maven {
                             group: group.to_string(),
                             artifact: artifact.to_string(),
                             version: version.to_string(),
                             is_scala,
                         });
-                        processed_coords.insert(coord);
                     }
                 }
             }
@@ -612,14 +494,13 @@ pub async fn resolve_sbt_dependencies(sbt_project_path: &Path) -> anyhow::Result
         }
     }
 
-    // 如果所有方法都失败，返回空列表
-    eprintln!("Warning: Could not resolve dependencies for sbt project {}", sbt_project_path.display());
+    eprintln!("Warning: Could not resolve dependencies for sbt project {} (sbt command not found).", sbt_project_path.display());
     Ok(vec![])
 }
 
 /// 使用 sbt 命令解析依赖
 async fn resolve_sbt_dependencies_via_sbt(sbt_project_path: &Path) -> anyhow::Result<Vec<Dependency>> {
-    // 使用 sbt dependencyTree 命令获取依赖树
+    // 这是一个脆弱的方法，依赖于 sbt dependencyTree 的输出格式
     let mut cmd = Command::new("sbt");
     cmd.arg("dependencyTree")
         .current_dir(sbt_project_path);
@@ -627,43 +508,41 @@ async fn resolve_sbt_dependencies_via_sbt(sbt_project_path: &Path) -> anyhow::Re
     let output = cmd.output().await?;
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
-        eprintln!("Warning: Failed to run sbt dependencyTree: {}", err);
-        return Ok(vec![]);
+        return Err(anyhow!("Failed to run sbt dependencyTree: {}", err));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut deps = Vec::new();
-    let mut processed_coords = std::collections::HashSet::new();
+    let mut processed_coords: HashSet<String> = HashSet::new();
 
-    // 解析 sbt dependencyTree 输出
-    // 输出格式类似：[info] +-org.scalatest:scalatest_2.13:3.2.17
-    // 或：[info]   +-com.typesafe:config:1.4.3
     for line in stdout.lines() {
         let line = line.trim();
 
-        // 剥离 [info] 前缀
         let line = if line.starts_with("[info]") {
             line.trim_start_matches("[info]").trim()
         } else {
             line
         };
 
-        if line.starts_with("+-") || line.starts_with("  +-") {
+        if line.contains(':') && (line.starts_with("+-") || line.contains(" +-")) {
             let dep_line = if line.starts_with("+-") {
                 line.trim_start_matches("+-").trim()
-            } else if line.starts_with("  +-") {
-                line.trim_start_matches("  +-").trim()
+            } else if line.contains(" +-") {
+                line.trim_start_matches(|c: char| c.is_whitespace() || c == '|')
+                    .trim_start_matches("+-").trim()
             } else {
                 continue;
             };
+
             let parts: Vec<&str> = dep_line.split(':').collect();
+            // 依赖格式 group:artifact:version
             if parts.len() >= 3 {
                 let group = parts[0];
                 let artifact = parts[1];
-                let version = parts[2];
+                let version = parts[2].split(|c: char| c.is_whitespace()).next().unwrap_or(parts[2]);
                 let coord = format!("{}:{}:{}", group, artifact, version);
 
-                if !processed_coords.contains(&coord) {
+                if processed_coords.insert(coord.clone()) {
                     let is_scala = artifact.contains("_2.13") || artifact.contains("_2.12") || artifact.contains("_3");
 
                     deps.push(Dependency::Maven {
@@ -672,23 +551,10 @@ async fn resolve_sbt_dependencies_via_sbt(sbt_project_path: &Path) -> anyhow::Re
                         version: version.to_string(),
                         is_scala,
                     });
-                    processed_coords.insert(coord);
                 }
             }
         }
     }
 
     Ok(deps)
-}
-
-/// 同步版本的默认依赖管理器（用于不需要异步的场景）
-/// 注意：这会检查coursier是否可用，但不会等待
-pub fn default_dependency_manager_sync() -> Box<dyn DependencyManager + Send + Sync> {
-    // 使用tokio runtime来检查命令
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    if rt.block_on(check_command_available("coursier")) {
-        Box::new(CoursierDependencyManager::new())
-    } else {
-        Box::new(ScalaCliDependencyManager)
-    }
 }

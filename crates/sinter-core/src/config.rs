@@ -6,7 +6,7 @@ use anyhow::Context;
 use config::Config;
 use toml_edit::{value, DocumentMut, Item, Table};
 
-use crate::deps::deps::Dependency;
+use crate::deps::Dependency;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Project {

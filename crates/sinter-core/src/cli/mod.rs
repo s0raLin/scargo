@@ -1,58 +1,49 @@
-// src/cli.rs
+// src/cli/mod.rs
 use clap::{Arg, Command};
-use std::path::PathBuf;
 
+pub mod commands;
+pub mod builtin;
+pub mod parser;
+
+
+
+#[derive(Debug)]
 pub struct Cli {
-    pub command: Option<crate::cmd::Commands>,
+    pub command: Option<Commands>,
     pub raw_matches: clap::ArgMatches,
 }
 
+impl std::ops::Deref for Cli {
+    type Target = Option<Commands>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.command
+    }
+}
+
+
+// 命令枚举定义
+#[derive(Debug, Clone)]
+pub enum Commands {
+    New {name: String},
+    Init,
+    Build,
+    Run {file: Option<std::path::PathBuf>,lib: bool,},
+    Add {deps: Vec<String>,},
+    Test {file: Option<std::path::PathBuf>,},
+    Workspace {subcommand: WorkspaceCommands,},
+    Jsp {name: String,},
+}
+
+
+#[derive(clap::Subcommand, Debug, Clone)]
+pub enum WorkspaceCommands {
+    Add {paths: Vec<String>,},
+}
+
 impl Cli {
-
-    // 辅助函数：安全提取必需的字符串参数
-    fn extract_required_string(matches: &clap::ArgMatches, key: &str) -> String {
-        matches.get_one::<String>(key).unwrap().clone()
-    }
-
-    // 辅助函数：安全提取可选的字符串参数并转换为PathBuf
-    fn extract_optional_path(matches: &clap::ArgMatches, key: &str) -> Option<PathBuf> {
-        matches.get_one::<String>(key).map(|s| PathBuf::from(s))
-    }
-
     pub fn parse() -> Self {
         Self::parse_with_plugins(&[])
-    }
-
-    fn parse_command_from_matches(matches: &clap::ArgMatches) -> Option<crate::cmd::Commands> {
-        match matches.subcommand() {
-            Some(("new", sub_m)) => Some(crate::cmd::Commands::New {
-                name: Self::extract_required_string(sub_m, "name"),
-            }),
-            Some(("init", _)) => Some(crate::cmd::Commands::Init),
-            Some(("build", _)) => Some(crate::cmd::Commands::Build),
-            Some(("run", sub_m)) => Some(crate::cmd::Commands::Run {
-                file: Self::extract_optional_path(sub_m, "file"),
-                lib: sub_m.get_flag("lib"),
-            }),
-            Some(("add", sub_m)) => Some(crate::cmd::Commands::Add {
-                deps: sub_m.get_many::<String>("dep").unwrap_or_default().map(|s| s.to_string()).collect(),
-            }),
-            Some(("test", sub_m)) => Some(crate::cmd::Commands::Test {
-                file: Self::extract_optional_path(sub_m, "file"),
-            }),
-            Some(("workspace", ws_m)) => match ws_m.subcommand() {
-                Some(("add", sub_m)) => Some(crate::cmd::Commands::Workspace {
-                    subcommand: crate::cmd::WorkspaceCommands::Add {
-                        paths: sub_m.get_many::<String>("path").unwrap_or_default().map(|s| s.to_string()).collect(),
-                    }
-                }),
-                _ => None,
-            },
-            Some(("jsp", sub_m)) => Some(crate::cmd::Commands::Jsp {
-                name: Self::extract_required_string(sub_m, "name"),
-            }),
-            _ => None,
-        }
     }
 
     pub fn parse_with_plugins(plugins: &[Box<dyn crate::core::CommandHandler>]) -> Self {
@@ -133,7 +124,7 @@ impl Cli {
 
         let matches = cmd.get_matches();
 
-        let command = Self::parse_command_from_matches(&matches);
+        let command = parser::parse_command_from_matches(&matches);
 
         Cli { command, raw_matches: matches }
     }

@@ -15,11 +15,6 @@ pub mod config;
 // 功能模块
 pub mod build;
 pub mod deps;
-pub mod cmd;
-
-// 宏和工具
-#[macro_use]
-pub mod commands;
 
 // 国际化支持（构建时生成）
 pub mod i18n;
@@ -28,5 +23,4 @@ pub mod i18n;
 
 // 公共 API
 pub use core::{CommandHandler, Sinter};
-pub use cli::Cli;
-pub use cmd::{Commands, WorkspaceCommands};
+pub use cli::{Cli, Commands, WorkspaceCommands};

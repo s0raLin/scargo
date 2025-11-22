@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use tokio::process::Command;
 
 pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let workspace_root = crate::config::find_workspace_root(cwd);
@@ -52,27 +51,18 @@ pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()
     }
 
     // Use scala-cli test
-    let mut cmd = Command::new("scala-cli");
-    cmd.arg("test").arg(&abs_test_target);
-    cmd.current_dir(&project_dir);
+    let mut args: Vec<String> = vec!["test".to_string(), abs_test_target.to_string_lossy().to_string()];
 
     for dep in deps {
-        cmd.arg("--dependency").arg(dep.coord());
+        args.push("--dependency".to_string());
+        args.push(dep.coord());
     }
 
-    let output = cmd.output().await?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = crate::build::scala_cli::execute_scala_cli(&args_str, Some(&project_dir)).await?;
 
-    if !stdout.is_empty() {
-        println!("{}", stdout);
-    }
-    if !stderr.is_empty() {
-        eprintln!("{}", stderr);
-    }
-
-    if !output.status.success() {
-        anyhow::bail!("Test failed");
+    if !output.is_empty() {
+        println!("{}", output);
     }
 
     Ok(())

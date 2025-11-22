@@ -1,27 +1,7 @@
 // src/run.rs
 use std::path::Path;
 
-use tokio::process::Command;
-
-/// 检测Scala文件是否包含main方法
-fn has_main_method(content: &str) -> bool {
-    content.contains("def main(") || content.contains("extends App")
-}
-
-// src/run.rs
-use anyhow::Context;
-
-
-#[derive(Debug, PartialEq)]
-pub enum RunMode {
-    App,   // 有 main 或 extends App
-    Lib,   // 无入口 -> 只编译
-}
-
-pub struct RunResult {
-    pub mode: RunMode,
-    pub output: String,
-}
+use crate::build::common::{has_main_method, RunMode, RunResult};
 
 pub async fn run_scala_file(
     proj_dir: &Path,
@@ -40,20 +20,14 @@ pub async fn run_scala_file(
     };
 
     // 2. 调用 scala-cli
-    let mut cmd = Command::new("scala-cli");
-
-    if mode == RunMode::Lib {
-        cmd.arg("compile").arg(&abs_file);
+    let args: Vec<String> = if mode == RunMode::Lib {
+        vec!["compile".to_string(), abs_file.to_string_lossy().to_string()]
     } else {
-        cmd.arg("run").arg(&abs_file);
-    }
+        vec!["run".to_string(), abs_file.to_string_lossy().to_string()]
+    };
 
-    cmd.current_dir(proj_dir);
-
-    let output = cmd
-        .output()
-        .await
-        .context("failed to execute scala-cli")?;
+    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(proj_dir)).await?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -91,20 +65,18 @@ pub async fn run_single_file_with_deps(
     let dep_manager = crate::deps::default_dependency_manager().await;
     dep_manager.prepare_dependencies(deps, &proj_dir.join("target")).await?;
 
-    let mut cmd = Command::new("scala-cli");
-    cmd.current_dir(proj_dir);
-
-    if has_main {
-        cmd.arg("run").arg(&abs_file);
+    let mut args: Vec<String> = if has_main {
+        vec!["run".to_string(), abs_file.to_string_lossy().to_string()]
     } else {
-        cmd.arg("compile").arg(&abs_file);
-    }
+        vec!["compile".to_string(), abs_file.to_string_lossy().to_string()]
+    };
 
     // 添加依赖参数
     let dep_args = dep_manager.get_run_args(deps);
-    cmd.args(&dep_args);
+    args.extend(dep_args);
 
-    let output = cmd.output().await?;
+    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(proj_dir)).await?;
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("Failed: {}", err);
