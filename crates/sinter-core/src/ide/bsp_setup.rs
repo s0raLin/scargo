@@ -26,7 +26,7 @@ pub async fn setup_bsp(bsp_dir: &Path, deps: &[Dependency], source_dirs: &[(Stri
                 args.push(dep.coord());
             }
             let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-            let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(bsp_dir)).await?;
+            let output = crate::build::run_scala_cli(&args_str, Some(bsp_dir)).await?;
             if !output.status.success() {
                 anyhow::bail!("BSP setup failed");
             }

@@ -1,9 +1,13 @@
 pub mod builder;
-pub mod bsp;
+pub mod scala_cli_builder;
+pub mod sbt_builder;
+pub mod backend;
 pub mod runner;
 pub mod common;
-pub mod scala_cli;
 
-pub use builder::build_with_deps;
-pub use bsp::setup_bsp;
-pub use runner::{run_scala_file, run_single_file_with_deps};
+pub use builder::*;
+pub use scala_cli_builder::*;
+pub use sbt_builder::*;
+pub use backend::*;
+pub use runner::*;
+pub use common::*;

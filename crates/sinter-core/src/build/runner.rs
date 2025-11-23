@@ -27,7 +27,7 @@ pub async fn run_scala_file(
     };
 
     let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(proj_dir)).await?;
+    let output = crate::build::run_scala_cli(&args_str, Some(proj_dir)).await?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -76,7 +76,7 @@ pub async fn run_single_file_with_deps(
     args.extend(dep_args);
 
     let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(proj_dir)).await?;
+    let output = crate::build::run_scala_cli(&args_str, Some(proj_dir)).await?;
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("Failed: {}", err);

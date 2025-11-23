@@ -23,7 +23,7 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
         } else {
             vec![("".to_string(), source_dir.to_string())]
         };
-        crate::build::bsp::setup_bsp(bsp_dir, deps, &source_dirs, backend).await?;
+        crate::ide::setup_bsp(bsp_dir, deps, &source_dirs, backend).await?;
     }
 
     match backend {
@@ -41,7 +41,7 @@ pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &
                 args.push(dep.coord());
             }
             let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-            let output = crate::build::scala_cli::run_scala_cli(&args_str, Some(proj_dir)).await?;
+            let output = crate::build::run_scala_cli(&args_str, Some(proj_dir)).await?;
             if !output.status.success() {
                 anyhow::bail!("Build failed with dependencies");
             }

@@ -3,7 +3,8 @@
 //! 包含所有内置命令的执行逻辑
 
 use crate::cli::{Commands, commands::{cmd_new, cmd_init, cmd_test, cmd_workspace}};
-use crate::build::{run_scala_file, run_single_file_with_deps, setup_bsp};
+use crate::build::{scala_cli_builder, sbt_builder, run_scala_file, run_single_file_with_deps};
+use crate::ide::{bsp_setup, setup_bsp};
 use crate::deps::add_dependency;
 use std::path::PathBuf;
 
@@ -43,9 +44,9 @@ pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result
 pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
     if cwd.join("project.toml").exists() {
         let project = crate::config::load_project(cwd)?;
-        let target = crate::config::get_main_file_path(&project);
+        let target = project.get_main_file_path();
         if cwd.join(&target).exists() {
-            let deps = crate::config::get_dependencies(&project);
+            let deps = crate::dependency::get_dependencies(&project);
             let output = run_single_file_with_deps(cwd, &target, &deps).await?;
             println!("{}", output);
         } else {
@@ -71,7 +72,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
             let mut backend = None;
             for member in members.iter() {
                 let member_dir = cwd.join(&member.package.name);
-                let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), &member_dir).await?;
+                let transitive_deps = crate::dependency::get_transitive_dependencies_with_workspace(&member, Some(&root_project), &member_dir).await?;
                 all_deps.extend(transitive_deps.clone());
                 source_dirs.push((member.package.name.clone(), member.package.source_dir.clone()));
                 if backend.is_none() {
@@ -107,7 +108,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                 let (root_project, members) = crate::config::load_workspace(&workspace_root)?.unwrap();
                 let member_name = cwd.strip_prefix(&workspace_root).unwrap().components().next().unwrap().as_os_str().to_str().unwrap();
                 if let Some(member) = members.into_iter().find(|m| m.package.name == member_name) {
-                    let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&member, Some(&root_project), cwd).await?;
+                    let transitive_deps = crate::dependency::get_transitive_dependencies_with_workspace(&member, Some(&root_project), cwd).await?;
                     crate::build::build_with_deps(
                         cwd,
                         &transitive_deps,
@@ -128,7 +129,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
                 }
             } else {
                 // Single project build
-                let transitive_deps = crate::config::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
+                let transitive_deps = crate::dependency::get_transitive_dependencies_with_workspace(&project, None, cwd).await?;
                 crate::build::build_with_deps(
                     cwd,
                     &transitive_deps,
@@ -193,9 +194,9 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     // 获取依赖
     let deps = if let Some(ws_root) = workspace_root_ref {
         let ws_proj = crate::config::load_project(ws_root)?;
-        crate::config::get_dependencies_with_workspace(&project, Some(&ws_proj))
+        crate::dependency::get_dependencies_with_workspace(&project, Some(&ws_proj))
     } else {
-        crate::config::get_dependencies(&project)
+        crate::dependency::get_dependencies(&project)
     };
 
     // 设置 BSP 以支持 IDE
@@ -208,7 +209,7 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     };
     setup_bsp(bsp_dir, &deps, &source_dirs, &project.package.backend).await?;
 
-    let target = file.unwrap_or_else(|| crate::config::get_main_file_path(&project));
+    let target = file.unwrap_or_else(|| project.get_main_file_path());
 
     if !project_dir.join(&target).exists() {
         anyhow::bail!("File not found: {}", target.display());

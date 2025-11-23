@@ -376,7 +376,7 @@ impl DependencyManager for ScalaCliDependencyManager {
             Dependency::Maven { .. } => {
                 let args: Vec<String> = vec!["--dependency".to_string(), dep.coord(), "--quiet".to_string(), "-e".to_string(), "println(\"test\")".to_string()];
                 let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                let output = crate::build::scala_cli::run_scala_cli(&args_str, None).await?;
+                let output = crate::build::run_scala_cli(&args_str, None).await?;
                 if !output.status.success() {
                     let err = String::from_utf8_lossy(&output.stderr);
                     anyhow::bail!("Dependency {} is not available: {}", dep.coord(), err);

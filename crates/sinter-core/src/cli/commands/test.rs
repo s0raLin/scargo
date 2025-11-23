@@ -32,9 +32,9 @@ pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()
 
     let deps = if let Some(ws_root) = workspace_root {
         let ws_proj = crate::config::load_project(&ws_root)?;
-        crate::config::get_dependencies_with_workspace(&project, Some(&ws_proj))
+        crate::dependency::get_dependencies_with_workspace(&project, Some(&ws_proj))
     } else {
-        crate::config::get_dependencies(&project)
+        crate::dependency::get_dependencies(&project)
     };
 
     let test_target = if let Some(f) = file {
@@ -59,7 +59,7 @@ pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()
     }
 
     let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let output = crate::build::scala_cli::execute_scala_cli(&args_str, Some(&project_dir)).await?;
+    let output = crate::build::execute_scala_cli(&args_str, Some(&project_dir)).await?;
 
     if !output.is_empty() {
         println!("{}", output);
