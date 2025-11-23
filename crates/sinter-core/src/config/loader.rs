@@ -17,6 +17,12 @@ pub fn load_project(dir: &Path) -> anyhow::Result<Project> {
         .context("Failed to load project configuration")?;
     let proj: Project = settings.try_deserialize()
         .context("Failed to parse project configuration")?;
+
+    // 验证配置
+    if let Err(errors) = proj.validate() {
+        return Err(anyhow::anyhow!("项目配置验证失败:\n{}", errors.join("\n")));
+    }
+
     Ok(proj)
 }
 

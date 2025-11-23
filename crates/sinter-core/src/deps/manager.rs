@@ -1,4 +1,4 @@
-use crate::deps::deps::Dependency; // 假设此行是您的实际引用
+use crate::deps::deps::Dependency;
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};

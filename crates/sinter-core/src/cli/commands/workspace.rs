@@ -13,14 +13,14 @@ pub async fn cmd_workspace(cwd: &PathBuf, subcommand: &WorkspaceCommands) -> any
 
 async fn cmd_workspace_add(cwd: &PathBuf, member_paths: &[String]) -> anyhow::Result<()> {
     // Find workspace root
-    let workspace_root = crate::config::find_workspace_root(cwd)
+    let workspace_root = crate::config::loader::find_workspace_root(cwd)
         .ok_or_else(|| anyhow::anyhow!("{}", crate::i18n::t("not_in_workspace")))?;
 
     let manifest_path = workspace_root.join("project.toml");
 
     for member_path in member_paths {
         // Check if member already exists by trying to add it
-        match crate::config::add_workspace_member(&manifest_path, member_path) {
+        match crate::config::writer::add_workspace_member(&manifest_path, member_path) {
             Ok(_) => {
                 println!("{}", crate::i18n::tf("added_member_to_workspace", &[member_path]));
             }

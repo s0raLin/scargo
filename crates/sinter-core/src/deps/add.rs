@@ -1,7 +1,7 @@
 use std::path::Path;
 
 pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Result<()> {
-    let project = crate::config::load_project(project_dir)?;
+    let project = crate::config::loader::load_project(project_dir)?;
     let manifest_path = project_dir.join("project.toml");
 
     // 检测是否在工作空间根目录
@@ -24,10 +24,10 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
         let key = format!("sbt:{}", sbt_path);
         // 如果在工作空间根目录，添加到 workspace.dependencies
         if is_workspace_root {
-            crate::config::add_workspace_dependency_to_manifest(&manifest_path, &key, "")?;
+            crate::config::writer::add_workspace_dependency_to_manifest(&manifest_path, &key, "")?;
             println!("{}", crate::i18n::tf("added_dependency", &[&key, "sbt project (workspace)"]));
         } else {
-            crate::config::add_dependency_to_manifest(&manifest_path, &key, "")?;
+            crate::config::writer::add_dependency_to_manifest(&manifest_path, &key, "")?;
             println!("{}", crate::i18n::tf("added_dependency", &[&key, "sbt project"]));
         }
         return Ok(());
@@ -63,10 +63,10 @@ pub async fn add_dependency(project_dir: &Path, dep_spec: &str) -> anyhow::Resul
 
     // 如果在工作空间根目录，添加到 workspace.dependencies
     if is_workspace_root {
-        crate::config::add_workspace_dependency_to_manifest(&manifest_path, &full_key, &version)?;
+        crate::config::writer::add_workspace_dependency_to_manifest(&manifest_path, &full_key, &version)?;
         println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &format!("{} (workspace)", version)]));
     } else {
-        crate::config::add_dependency_to_manifest(&manifest_path, &full_key, &version)?;
+        crate::config::writer::add_dependency_to_manifest(&manifest_path, &full_key, &version)?;
         println!("{}", crate::i18n::tf("added_dependency", &[&full_key, &version]));
     }
     Ok(())

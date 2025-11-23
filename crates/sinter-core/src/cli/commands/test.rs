@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
-    let workspace_root = crate::config::find_workspace_root(cwd);
+    let workspace_root = crate::config::loader::find_workspace_root(cwd);
     let (project, project_dir) = if let Some(ws_root) = workspace_root.as_ref() {
         // In workspace, check if this is a member project
-        if let Some((_ws_proj, members)) = crate::config::load_workspace(ws_root)? {
+        if let Some((_ws_proj, members)) = crate::config::loader::load_workspace(ws_root)? {
             let relative_path = cwd.strip_prefix(ws_root).unwrap();
             if let Some(first_component) = relative_path.components().next() {
                 let member_name = first_component.as_os_str().to_str().unwrap();
@@ -12,26 +12,26 @@ pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()
                     (member, ws_root.clone().join(member_name))
                 } else {
                     // Not a workspace member, treat as standalone project
-                    let proj = crate::config::load_project(cwd)?;
+                    let proj = crate::config::loader::load_project(cwd)?;
                     (proj, cwd.clone())
                 }
             } else {
                 // cwd == ws_root, treat as standalone project
-                let proj = crate::config::load_project(cwd)?;
+                let proj = crate::config::loader::load_project(cwd)?;
                 (proj, cwd.clone())
             }
         } else {
             // No workspace config, treat as standalone project
-            let proj = crate::config::load_project(cwd)?;
+            let proj = crate::config::loader::load_project(cwd)?;
             (proj, cwd.clone())
         }
     } else {
-        let proj = crate::config::load_project(cwd)?;
+        let proj = crate::config::loader::load_project(cwd)?;
         (proj, cwd.clone())
     };
 
     let deps = if let Some(ws_root) = workspace_root {
-        let ws_proj = crate::config::load_project(&ws_root)?;
+        let ws_proj = crate::config::loader::load_project(&ws_root)?;
         crate::dependency::get_dependencies_with_workspace(&project, Some(&ws_proj))
     } else {
         crate::dependency::get_dependencies(&project)

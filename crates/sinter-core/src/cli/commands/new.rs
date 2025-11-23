@@ -22,13 +22,13 @@ pub async fn cmd_new(cwd: &PathBuf, name: &str) -> anyhow::Result<()> {
     .await?;
 
     // Auto-add to workspace if in one
-    if let Some(workspace_root) = crate::config::find_workspace_root(cwd) {
+    if let Some(workspace_root) = crate::config::loader::find_workspace_root(cwd) {
         let manifest_path = workspace_root.join("project.toml");
         let relative_path = proj_dir.strip_prefix(&workspace_root)
             .unwrap_or(&proj_dir)
             .to_string_lossy()
             .to_string();
-        match crate::config::add_workspace_member(&manifest_path, &relative_path) {
+        match crate::config::writer::add_workspace_member(&manifest_path, &relative_path) {
             Ok(_) => {
                 println!("{}", crate::i18n::tf("added_project_to_workspace", &[name]));
             }

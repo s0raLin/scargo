@@ -38,8 +38,6 @@ mod config_compat;
 // 功能模块（已迁移）
 pub mod deps;
 
-// extern crate paste;
-
 // 公共 API
 pub use core::{CommandHandler, Sinter};
 pub use cli::{Cli, Commands, WorkspaceCommands};
