@@ -1,15 +1,15 @@
-use std::path::PathBuf;
+use crate::toolkit::path::PathManager;
 
-pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
+pub async fn cmd_test(cwd: &PathManager, file: Option<PathManager>) -> anyhow::Result<()> {
     let workspace_root = crate::config::loader::find_workspace_root(cwd);
     let (project, project_dir) = if let Some(ws_root) = workspace_root.as_ref() {
         // In workspace, check if this is a member project
         if let Some((_ws_proj, members)) = crate::config::loader::load_workspace(ws_root)? {
-            let relative_path = cwd.strip_prefix(ws_root).unwrap();
-            if let Some(first_component) = relative_path.components().next() {
+            let relative_path = cwd.relative_to(&PathManager::from(ws_root.clone()));
+            if let Some(first_component) = relative_path.as_path().components().next() {
                 let member_name = first_component.as_os_str().to_str().unwrap();
                 if let Some(member) = members.into_iter().find(|m| m.package.name == member_name) {
-                    (member, ws_root.clone().join(member_name))
+                    (member, PathManager::from(ws_root.clone()).join(member_name))
                 } else {
                     // Not a workspace member, treat as standalone project
                     let proj = crate::config::loader::load_project(cwd)?;
@@ -40,13 +40,13 @@ pub async fn cmd_test(cwd: &PathBuf, file: Option<PathBuf>) -> anyhow::Result<()
     let test_target = if let Some(f) = file {
         f
     } else {
-        PathBuf::from(&project.package.test_dir)
+        PathManager::new(&project.package.test_dir)
     };
 
-    let abs_test_target = project_dir.join(&test_target);
+    let abs_test_target = project_dir.join(test_target.as_path());
 
-    if !abs_test_target.exists() {
-        println!("No tests found in {}", test_target.display());
+    if !abs_test_target.exists_sync() {
+        println!("No tests found in {}", test_target.to_path_buf().display());
         return Ok(());
     }
 

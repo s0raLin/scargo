@@ -5,6 +5,7 @@
 use std::path::Path;
 use anyhow::Context;
 use toml_edit::{value, DocumentMut, Item, Table};
+use crate::toolkit::os::{PathWrapper, read_sync, write_sync};
 
 /// 向项目manifest添加依赖
 pub fn add_dependency_to_manifest(manifest_path: &Path, key: &str, version: &str) -> anyhow::Result<()> {
@@ -76,7 +77,8 @@ fn modify_toml_document<F>(manifest_path: &Path, modifier: F) -> anyhow::Result<
 where
     F: FnOnce(&mut DocumentMut) -> anyhow::Result<()>,
 {
-    let content = std::fs::read_to_string(manifest_path)
+    let path_wrapper = PathWrapper::new(manifest_path);
+    let content = read_sync(&path_wrapper)
         .with_context(|| format!("Failed to read file: {}", manifest_path.display()))?;
 
     let mut doc: DocumentMut = content
@@ -85,7 +87,7 @@ where
 
     modifier(&mut doc)?;
 
-    std::fs::write(manifest_path, doc.to_string())
+    write_sync(&path_wrapper, &doc.to_string())
         .with_context(|| format!("Failed to write file: {}", manifest_path.display()))?;
 
     Ok(())

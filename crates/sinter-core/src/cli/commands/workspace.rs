@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-
 use crate::cli::WorkspaceCommands;
+use crate::toolkit::path::PathManager;
 
-pub async fn cmd_workspace(cwd: &PathBuf, subcommand: &WorkspaceCommands) -> anyhow::Result<()> {
+pub async fn cmd_workspace(cwd: &PathManager, subcommand: &WorkspaceCommands) -> anyhow::Result<()> {
     match subcommand {
         WorkspaceCommands::Add { paths } => {
             cmd_workspace_add(cwd, paths).await?;
@@ -11,7 +10,7 @@ pub async fn cmd_workspace(cwd: &PathBuf, subcommand: &WorkspaceCommands) -> any
     Ok(())
 }
 
-async fn cmd_workspace_add(cwd: &PathBuf, member_paths: &[String]) -> anyhow::Result<()> {
+async fn cmd_workspace_add(cwd: &PathManager, member_paths: &[String]) -> anyhow::Result<()> {
     // Find workspace root
     let workspace_root = crate::config::loader::find_workspace_root(cwd)
         .ok_or_else(|| anyhow::anyhow!("{}", crate::i18n::t("not_in_workspace")))?;

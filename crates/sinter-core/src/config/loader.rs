@@ -15,8 +15,12 @@ pub fn load_project(dir: &Path) -> anyhow::Result<Project> {
         .add_source(config::File::from(manifest_path))
         .build()
         .context("Failed to load project configuration")?;
-    let proj: Project = settings.try_deserialize()
+    let mut proj: Project = settings.try_deserialize()
         .context("Failed to parse project configuration")?;
+
+    // 设置项目根路径，映射到实际目录
+    proj.root_path = dir.canonicalize()
+        .context("Failed to canonicalize project directory path")?;
 
     // 验证配置
     if let Err(errors) = proj.validate() {
@@ -70,10 +74,18 @@ pub fn load_workspace(dir: &Path) -> anyhow::Result<Option<(Project, Vec<Project
         .build()
         .context("Failed to load workspace configuration")?;
 
-    let root_project: Project = settings.try_deserialize()
+    let mut root_project: Project = settings.try_deserialize()
         .context("Failed to parse workspace configuration")?;
 
-    if let Some(workspace) = &root_project.workspace {
+    // 设置项目根路径
+    root_project.root_path = dir.canonicalize()
+        .context("Failed to canonicalize workspace directory path")?;
+
+    if let Some(workspace) = &mut root_project.workspace {
+        // 设置工作区根路径，映射到实际目录
+        workspace.root_path = dir.canonicalize()
+            .context("Failed to canonicalize workspace directory path")?;
+
         let mut members = Vec::new();
         for member_path in &workspace.members {
             let member_dir = dir.join(member_path);

@@ -1,0 +1,12 @@
+[package]
+name = "workspace"
+version = "0.1.0"
+scala_version = "2.13"
+source_dir = "src/main/scala"
+target_dir = "target"
+test_dir = "src/test/scala"
+
+[workspace]
+members = ["first", "second"]
+
+[dependencies]

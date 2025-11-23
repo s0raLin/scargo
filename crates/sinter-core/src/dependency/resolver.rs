@@ -1,6 +1,6 @@
 //! 依赖解析接口
 
-use crate::domain::{Project, DependencySpec, DependencyDetail};
+use crate::domain::{Project, DependencySpec};
 use crate::deps::Dependency;
 
 /// 依赖解析器trait

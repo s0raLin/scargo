@@ -28,4 +28,5 @@ paste       = { workspace = true }
 inventory   = { workspace = true }
 serde_json  = { workspace = true }
 walkdir     = "2"
+reqwest     = { version = "0.11", features = ["json"] }
 

@@ -5,6 +5,7 @@
 use crate::core::handler::CommandHandler;
 use crate::cli::Cli;
 use crate::runtime::Executor;
+use crate::toolkit::path::PathManager;
 
 /// Sinter 应用构建器
 ///
@@ -55,7 +56,7 @@ impl Sinter {
     /// 解析命令行参数，执行对应的命令
     pub async fn run(self) -> anyhow::Result<()> {
         let cli = Cli::parse_with_plugins(&self.plugins);
-        let cwd = std::env::current_dir()?;
+        let cwd = PathManager::current_dir().await?;
         Executor::new(self.plugins).execute(cli, cwd).await
     }
 }

@@ -4,7 +4,7 @@
 
 use crate::core::handler::CommandHandler;
 use crate::cli::{Cli, builtin};
-use std::path::PathBuf;
+use crate::toolkit::path::PathManager;
 
 /// 命令执行器
 ///
@@ -24,11 +24,11 @@ impl Executor {
     /// 执行命令
     ///
     /// 根据 CLI 解析结果，执行对应的命令
-    pub async fn execute(&self, cli: Cli, cwd: PathBuf) -> anyhow::Result<()> {
+    pub async fn execute(&self, cli: Cli, cwd: PathManager) -> anyhow::Result<()> {
         // 首先检查是否是插件命令
         if let Some((command_name, matches)) = cli.raw_matches.subcommand() {
             if let Some(handler) = self.plugins.iter().find(|cmd| cmd.name() == command_name) {
-                return handler.execute(matches, &cwd).await;
+                return handler.execute(matches, &cwd.to_path_buf()).await;
             }
         }
 

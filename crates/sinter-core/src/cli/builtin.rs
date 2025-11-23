@@ -6,11 +6,11 @@ use crate::cli::{Commands, commands::{cmd_new, cmd_init, cmd_test, cmd_workspace
 use crate::build::{run_scala_file, run_single_file_with_deps};
 use crate::ide::setup_bsp;
 use crate::deps::add_dependency;
-use std::path::PathBuf;
+use crate::toolkit::path::PathManager;
 use crate::config::loader;
 
 /// 执行内置命令
-pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result<()> {
+pub async fn execute_command(command: Commands, cwd: &PathManager) -> anyhow::Result<()> {
     match command {
         Commands::New { name } => {
             cmd_new(cwd, &name).await?;
@@ -25,13 +25,13 @@ pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result
             execute_build(cwd).await?;
         }
         Commands::Run { file, lib } => {
-            execute_run(cwd, file, lib).await?;
+            execute_run(cwd, file.map(PathManager::from), lib).await?;
         }
         Commands::Add { deps } => {
             execute_add(cwd, &deps).await?;
         }
         Commands::Test { file } => {
-            cmd_test(cwd, file).await?;
+            cmd_test(cwd, file.map(PathManager::from)).await?;
         }
         Commands::Jsp { name } => {
             // JSP 命令应该由插件系统处理
@@ -42,11 +42,11 @@ pub async fn execute_command(command: Commands, cwd: &PathBuf) -> anyhow::Result
 }
 
 /// 执行默认行为（无命令时）
-pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
-    if cwd.join("project.toml").exists() {
+pub async fn execute_default(cwd: &PathManager) -> anyhow::Result<()> {
+    if cwd.join("project.toml").exists_sync() {
         let project = loader::load_project(cwd)?;
         let target = project.get_main_file_path();
-        if cwd.join(&target).exists() {
+        if cwd.join(&target).exists_sync() {
             let deps = crate::dependency::get_dependencies(&project);
             let output = run_single_file_with_deps(cwd, &target, &deps).await?;
             println!("{}", output);
@@ -63,7 +63,7 @@ pub async fn execute_default(cwd: &PathBuf) -> anyhow::Result<()> {
 }
 
 /// 执行构建命令
-async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
+async fn execute_build(cwd: &PathManager) -> anyhow::Result<()> {
     if let Ok(project) = loader::load_project(cwd) {
         if project.workspace.is_some() {
             // Workspace build - build all members
@@ -177,7 +177,7 @@ async fn execute_build(cwd: &PathBuf) -> anyhow::Result<()> {
 }
 
 /// 执行运行命令
-async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow::Result<()> {
+async fn execute_run(cwd: &PathManager, file: Option<PathManager>, lib: bool) -> anyhow::Result<()> {
     let workspace_root = crate::config::loader::find_workspace_root(cwd);
     let workspace_root_ref = workspace_root.as_ref();
 
@@ -185,15 +185,15 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     let (project, project_dir) = if let Some(ws_root) = workspace_root_ref {
         // 在 workspace 中，查找成员项目
         if let Some((_ws_proj, members)) = crate::config::loader::load_workspace(ws_root)? {
-            let relative_path = cwd.strip_prefix(ws_root).map_err(|_| anyhow::anyhow!("Invalid workspace structure"))?;
-            let member_name = relative_path.components().next()
+            let relative_path = cwd.relative_to(&PathManager::from(ws_root.clone()));
+            let member_name = relative_path.as_path().components().next()
                 .and_then(|c| c.as_os_str().to_str())
                 .ok_or_else(|| anyhow::anyhow!("Cannot determine member name from path"))?;
             if let Some(member) = members
                 .into_iter()
                 .find(|m| m.package.name == member_name)
             {
-                (member, ws_root.clone().join(member_name))
+                (member, PathManager::from(ws_root.clone()).join(member_name))
             } else {
                 // 不是成员，作为单个项目处理
                 let proj = crate::config::loader::load_project(cwd)?;
@@ -218,7 +218,7 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     };
 
     // 设置 BSP 以支持 IDE
-    let bsp_dir = workspace_root_ref.unwrap_or(&project_dir);
+    let bsp_dir = workspace_root_ref.map(|p| PathManager::from(p.clone())).unwrap_or_else(|| project_dir.clone());
     let source_dirs = if let Some(ws_root) = workspace_root_ref {
         let member_name = project_dir.strip_prefix(ws_root)
             .map_err(|_| anyhow::anyhow!("Invalid project directory structure"))?
@@ -228,12 +228,12 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
     } else {
         vec![("".to_string(), project.get_source_dir().to_string())]
     };
-    setup_bsp(bsp_dir, &deps, &source_dirs, project.get_backend()).await?;
+    setup_bsp(bsp_dir.as_path(), &deps, &source_dirs, project.get_backend()).await?;
 
-    let target = file.unwrap_or_else(|| project.get_main_file_path());
+    let target = file.unwrap_or_else(|| PathManager::from(project.get_main_file_path()));
 
-    if !project_dir.join(&target).exists() {
-        anyhow::bail!("File not found: {}", target.display());
+    if !project_dir.join(target.as_path()).exists_sync() {
+        anyhow::bail!("File not found: {}", target.to_path_buf().display());
     }
 
     if lib {
@@ -251,11 +251,11 @@ async fn execute_run(cwd: &PathBuf, file: Option<PathBuf>, lib: bool) -> anyhow:
 }
 
 /// 执行添加依赖命令
-async fn execute_add(cwd: &PathBuf, deps: &[String]) -> anyhow::Result<()> {
+async fn execute_add(cwd: &PathManager, deps: &[String]) -> anyhow::Result<()> {
     let workspace_root = loader::find_workspace_root(cwd);
-    let project_dir = workspace_root.unwrap_or_else(|| cwd.clone());
+    let project_dir = workspace_root.map(PathManager::from).unwrap_or_else(|| cwd.clone());
     for dep in deps {
-        add_dependency(&project_dir, dep).await?;
+        add_dependency(&project_dir.to_path_buf(), dep).await?;
     }
     Ok(())
 }

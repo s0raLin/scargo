@@ -32,11 +32,11 @@ pub mod core;
 // 国际化支持（构建时生成）
 pub mod i18n;
 
-// 兼容性层（已废弃）
-mod config_compat;
-
 // 功能模块（已迁移）
 pub mod deps;
+
+// 工具包
+pub mod toolkit;
 
 // 公共 API
 pub use core::{CommandHandler, Sinter};

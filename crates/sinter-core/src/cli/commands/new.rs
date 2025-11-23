@@ -1,25 +1,28 @@
-use std::path::PathBuf;
+use crate::toolkit::file::ProjectCreator;
+use crate::toolkit::template::Template;
+use crate::toolkit::path::PathManager;
 
-pub async fn cmd_new(cwd: &PathBuf, name: &str) -> anyhow::Result<()> {
+pub async fn cmd_new(cwd: &PathManager, name: &str) -> anyhow::Result<()> {
     let proj_dir = cwd.join(name);
-    if proj_dir.exists() {
+    if proj_dir.exists_sync() {
         println!("{}", crate::i18n::tf("project_already_exists", &[name]));
         return Ok(());
     }
-    tokio::fs::create_dir_all(proj_dir.join("src/main/scala")).await?;
+
+    let creator = ProjectCreator::new(&proj_dir);
+    creator.create_dirs(&["src/main/scala"]).await?;
 
     // project.toml
-    let template = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/project.toml.template"));
-    let manifest = template.replace("{name}", name);
-    tokio::fs::write(proj_dir.join("project.toml"), manifest).await?;
+    let template_path = crate::toolkit::path::paths::project_template();
+    let template_content = template_path.read_sync()?;
+    let template = Template::new(&template_content);
+    let manifest = template.replace("name", name).into_string();
+    creator.write_file("project.toml", &manifest).await?;
 
     // Hello world
-    let code = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/main.scala.template"));
-    tokio::fs::write(
-        proj_dir.join("src/main/scala/Main.scala"),
-        code,
-    )
-    .await?;
+    let main_template_path = crate::toolkit::path::paths::main_template();
+    let code = main_template_path.read_sync()?;
+    creator.write_file("src/main/scala/Main.scala", &code).await?;
 
     // Auto-add to workspace if in one
     if let Some(workspace_root) = crate::config::loader::find_workspace_root(cwd) {

@@ -2,12 +2,18 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use super::dependency::DependencySpec;
 use super::workspace::Workspace;
+use super::directory::Directory;
+use super::library::Library;
 
 /// 项目配置
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Project {
+    /// 项目根目录路径 - 映射到文件系统中的实际目录
+    #[serde(skip)]
+    pub root_path: PathBuf,
     pub package: Package,
     #[serde(default)]
     pub dependencies: HashMap<String, DependencySpec>,
@@ -16,26 +22,53 @@ pub struct Project {
 }
 
 impl Project {
-    /// 获取主文件路径
-    pub fn get_main_file_path(&self) -> std::path::PathBuf {
+    /// 创建带有根路径的项目实例
+    pub fn with_root_path(mut self, root_path: PathBuf) -> Self {
+        self.root_path = root_path;
+        self
+    }
+
+    /// 获取项目根目录的绝对路径
+    pub fn get_root_path(&self) -> &PathBuf {
+        &self.root_path
+    }
+
+    /// 获取主文件路径（绝对路径）
+    pub fn get_main_file_path(&self) -> PathBuf {
         let main_class = self.package.main.as_deref().unwrap_or("Main");
-        std::path::PathBuf::from(&self.package.source_dir)
+        self.root_path
+            .join(&self.package.source_dir)
             .join(format!("{}.scala", main_class))
     }
 
-    /// 获取源代码目录路径
+    /// 获取源代码目录路径（相对路径）
     pub fn get_source_dir(&self) -> &str {
         &self.package.source_dir
     }
 
-    /// 获取目标目录路径
+    /// 获取源代码目录绝对路径
+    pub fn get_source_dir_abs(&self) -> PathBuf {
+        self.root_path.join(&self.package.source_dir)
+    }
+
+    /// 获取目标目录路径（相对路径）
     pub fn get_target_dir(&self) -> &str {
         &self.package.target_dir
     }
 
-    /// 获取测试目录路径
+    /// 获取目标目录绝对路径
+    pub fn get_target_dir_abs(&self) -> PathBuf {
+        self.root_path.join(&self.package.target_dir)
+    }
+
+    /// 获取测试目录路径（相对路径）
     pub fn get_test_dir(&self) -> &str {
         &self.package.test_dir
+    }
+
+    /// 获取测试目录绝对路径
+    pub fn get_test_dir_abs(&self) -> PathBuf {
+        self.root_path.join(&self.package.test_dir)
     }
 
     /// 获取构建后端
@@ -85,6 +118,34 @@ impl Project {
     /// 获取工作空间配置（如果存在）
     pub fn get_workspace(&self) -> Option<&Workspace> {
         self.workspace.as_ref()
+    }
+
+    /// 获取项目目录实体
+    pub fn get_directory(&self) -> Directory {
+        Directory::from_path(&self.root_path)
+    }
+
+    /// 获取源代码目录实体
+    pub fn get_source_directory(&self) -> Directory {
+        Directory::from_path(self.get_source_dir_abs())
+    }
+
+    /// 获取目标目录实体
+    pub fn get_target_directory(&self) -> Directory {
+        Directory::from_path(self.get_target_dir_abs())
+    }
+
+    /// 获取测试目录实体
+    pub fn get_test_directory(&self) -> Directory {
+        Directory::from_path(self.get_test_dir_abs())
+    }
+
+    /// 获取所有依赖库实体
+    pub fn get_libraries(&self) -> Vec<Library> {
+        self.get_all_dependencies()
+            .into_iter()
+            .map(|(name, spec)| Library::from_dependency_spec(name, spec.clone()))
+            .collect()
     }
 
     /// 验证项目配置

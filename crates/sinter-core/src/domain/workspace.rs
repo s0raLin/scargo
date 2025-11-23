@@ -2,17 +2,51 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use super::dependency::DependencySpec;
+use super::directory::Directory;
+use super::library::Library;
 
 /// 工作空间配置
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Workspace {
+    /// 工作区根目录路径 - 映射到文件系统中的实际目录
+    #[serde(skip)]
+    pub root_path: PathBuf,
     pub members: Vec<String>,
     #[serde(default)]
     pub dependencies: HashMap<String, DependencySpec>,
 }
 
 impl Workspace {
+    /// 创建带有根路径的工作空间实例
+    pub fn with_root_path(mut self, root_path: PathBuf) -> Self {
+        self.root_path = root_path;
+        self
+    }
+
+    /// 获取工作区根目录的绝对路径
+    pub fn get_root_path(&self) -> &PathBuf {
+        &self.root_path
+    }
+
+    /// 获取指定成员的绝对路径
+    pub fn get_member_path(&self, member_path: &str) -> PathBuf {
+        self.root_path.join(member_path)
+    }
+
+    /// 获取所有成员的绝对路径
+    pub fn get_member_paths(&self) -> Vec<PathBuf> {
+        self.members.iter()
+            .map(|member| self.root_path.join(member))
+            .collect()
+    }
+
+    /// 检查成员路径是否存在
+    pub fn member_exists(&self, member_path: &str) -> bool {
+        self.get_member_path(member_path).exists()
+    }
+
     /// 验证工作空间配置
     pub fn validate(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
@@ -86,5 +120,24 @@ impl Workspace {
     pub fn remove_member(mut self, member_path: &str) -> Self {
         self.members.retain(|m| m != member_path);
         self
+    }
+
+    /// 获取工作区目录实体
+    pub fn get_directory(&self) -> Directory {
+        Directory::from_path(&self.root_path)
+    }
+
+    /// 获取所有成员目录实体
+    pub fn get_member_directories(&self) -> Vec<Directory> {
+        self.members.iter()
+            .map(|member| Directory::from_path(self.get_member_path(member)))
+            .collect()
+    }
+
+    /// 获取工作空间级依赖库实体
+    pub fn get_libraries(&self) -> Vec<Library> {
+        self.dependencies.iter()
+            .map(|(name, spec)| Library::from_dependency_spec(name.clone(), spec.clone()))
+            .collect()
     }
 }

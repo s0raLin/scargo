@@ -11,10 +11,18 @@
 
 use sinter_plugin_api::*;
 
-// 嵌入模板文件
-static POM_XML_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/pom.xml.template"));
-static WEB_XML_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/web.xml.template"));
-static INDEX_JSP_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/index.jsp.template"));
+// 模板文件路径
+fn pom_xml_template() -> String {
+    std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/pom.xml.template")).unwrap_or_default()
+}
+
+fn web_xml_template() -> String {
+    std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/web.xml.template")).unwrap_or_default()
+}
+
+fn index_jsp_template() -> String {
+    std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/index.jsp.template")).unwrap_or_default()
+}
 
 /// JSP 插件结构体
 pub struct JspPlugin;
@@ -60,14 +68,14 @@ impl CommandHandler for JspPlugin {
         fs::create_dir_all(proj_dir.join("src/main/resources")).await?;
 
         // 生成 pom.xml
-        let pom_xml = POM_XML_TEMPLATE.replace("{{name}}", name);
+        let pom_xml = pom_xml_template().replace("{{name}}", name);
         fs::write(proj_dir.join("pom.xml"), pom_xml).await?;
 
         // 生成 web.xml
-        fs::write(proj_dir.join("src/main/webapp/WEB-INF/web.xml"), WEB_XML_TEMPLATE).await?;
+        fs::write(proj_dir.join("src/main/webapp/WEB-INF/web.xml"), web_xml_template()).await?;
 
         // 生成 index.jsp
-        fs::write(proj_dir.join("src/main/webapp/index.jsp"), INDEX_JSP_TEMPLATE).await?;
+        fs::write(proj_dir.join("src/main/webapp/index.jsp"), index_jsp_template()).await?;
 
         println!("Created JSP project '{}'", name);
         println!("To build and run:");
