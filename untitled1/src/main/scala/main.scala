@@ -1,3 +1,0 @@
-@main def run = {
-  
-}
