@@ -1,6 +1,6 @@
 //! 构建后端抽象
 
-use crate::domain::Project;
+use crate::models::Project;
 
 /// 构建后端trait
 pub trait BuildBackend {

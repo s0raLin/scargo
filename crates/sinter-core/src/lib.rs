@@ -2,8 +2,8 @@
 //!
 //! 这是一个类似 Cargo 的 Scala 项目管理和构建工具。
 
-// 领域模型
-pub mod domain;
+// 数据模型
+pub mod models;
 
 // 配置管理
 pub mod config;
@@ -29,6 +29,15 @@ pub mod runtime;
 // 核心模块
 pub mod core;
 
+// 路由模块
+pub mod routes;
+
+// 控制器模块
+pub mod controllers;
+
+// 服务层模块
+pub mod services;
+
 // 国际化支持（构建时生成）
 pub mod i18n;
 
@@ -37,6 +46,12 @@ pub mod deps;
 
 // 工具包
 pub mod toolkit;
+
+// 错误处理
+pub mod error;
+
+// 依赖注入
+pub mod di;
 
 // 公共 API
 pub use core::{CommandHandler, Sinter};

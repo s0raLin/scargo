@@ -1,4 +1,4 @@
-//! 工作空间模型
+//! 工作空间模型和DTO
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -8,14 +8,20 @@ use super::directory::Directory;
 use super::library::Library;
 
 /// 工作空间配置
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Workspace {
     /// 工作区根目录路径 - 映射到文件系统中的实际目录
-    #[serde(skip)]
     pub root_path: PathBuf,
     pub members: Vec<String>,
-    #[serde(default)]
     pub dependencies: HashMap<String, DependencySpec>,
+}
+
+/// 工作空间DTO - 用于数据传输
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct WorkspaceDto {
+    pub members: Vec<String>,
+    #[serde(default)]
+    pub dependencies: HashMap<String, super::dependency::DependencyDto>,
 }
 
 impl Workspace {
@@ -64,6 +70,10 @@ impl Workspace {
             if member.contains("..") {
                 errors.push(format!("工作空间成员路径不能包含 '..': {}", member));
             }
+            // 检查路径是否为相对路径
+            if member.starts_with('/') || (cfg!(windows) && member.chars().nth(1) == Some(':')) {
+                errors.push(format!("工作空间成员路径应为相对路径: {}", member));
+            }
         }
 
         // 检查重复成员
@@ -84,6 +94,12 @@ impl Workspace {
                     errors.push(format!("工作空间依赖 '{}' 验证失败: {}", name, error));
                 }
             }
+        }
+
+        // 验证根目录
+        let root_dir = Directory::from_path(&self.root_path);
+        if let Err(dir_errors) = root_dir.validate() {
+            errors.extend(dir_errors);
         }
 
         if errors.is_empty() {
@@ -139,5 +155,27 @@ impl Workspace {
         self.dependencies.iter()
             .map(|(name, spec)| Library::from_dependency_spec(name.clone(), spec.clone()))
             .collect()
+    }
+
+    /// 转换为DTO
+    pub fn to_dto(&self) -> WorkspaceDto {
+        WorkspaceDto {
+            members: self.members.clone(),
+            dependencies: self.dependencies.iter()
+                .map(|(k, v)| (k.clone(), v.to_dto()))
+                .collect(),
+        }
+    }
+}
+
+impl From<WorkspaceDto> for Workspace {
+    fn from(dto: WorkspaceDto) -> Self {
+        Self {
+            root_path: PathBuf::new(), // 需要外部设置
+            members: dto.members,
+            dependencies: dto.dependencies.into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
+        }
     }
 }

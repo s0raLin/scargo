@@ -1,6 +1,6 @@
 //! 工作空间操作
 
-use crate::domain::Workspace;
+use crate::models::Workspace;
 
 /// 工作空间管理器
 pub struct WorkspaceManager;

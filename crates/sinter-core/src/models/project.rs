@@ -1,4 +1,4 @@
-//! 项目配置模型
+//! 项目配置模型和DTO
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,22 +9,62 @@ use super::directory::Directory;
 use super::library::Library;
 
 /// 项目配置
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Project {
     /// 项目根目录路径 - 映射到文件系统中的实际目录
-    #[serde(skip)]
     pub root_path: PathBuf,
     pub package: Package,
-    #[serde(default)]
     pub dependencies: HashMap<String, DependencySpec>,
-    #[serde(default)]
     pub workspace: Option<Workspace>,
+}
+
+/// 项目DTO - 用于数据传输
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ProjectDto {
+    pub package: PackageDto,
+    #[serde(default)]
+    pub dependencies: HashMap<String, super::dependency::DependencyDto>,
+    pub workspace: Option<super::workspace::WorkspaceDto>,
+}
+
+/// 包信息 - 领域对象
+#[derive(Debug, Clone)]
+pub struct Package {
+    pub name: String,
+    pub version: String,
+    pub main: Option<String>,
+    pub scala_version: String,
+    pub source_dir: String,
+    pub target_dir: String,
+    pub test_dir: String,
+    pub backend: String,
+}
+
+/// 包信息DTO - 用于数据传输
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct PackageDto {
+    pub name: String,
+    pub version: String,
+    pub main: Option<String>,
+    #[serde(default = "default_scala_version")]
+    pub scala_version: String,
+    #[serde(default = "default_source_dir")]
+    pub source_dir: String,
+    #[serde(default = "default_target_dir")]
+    pub target_dir: String,
+    #[serde(default = "default_test_dir")]
+    pub test_dir: String,
+    #[serde(default = "default_backend")]
+    pub backend: String,
 }
 
 impl Project {
     /// 创建带有根路径的项目实例
     pub fn with_root_path(mut self, root_path: PathBuf) -> Self {
-        self.root_path = root_path;
+        self.root_path = root_path.clone();
+        if let Some(ws) = &mut self.workspace {
+            *ws = ws.clone().with_root_path(root_path);
+        }
         self
     }
 
@@ -92,8 +132,8 @@ impl Project {
     }
 
     /// 获取所有依赖（包括工作空间级别的）
-    pub fn get_all_dependencies(&self) -> std::collections::HashMap<String, &DependencySpec> {
-        let mut deps = std::collections::HashMap::new();
+    pub fn get_all_dependencies(&self) -> HashMap<String, &DependencySpec> {
+        let mut deps = HashMap::new();
 
         // 添加项目级依赖
         for (name, spec) in &self.dependencies {
@@ -153,32 +193,14 @@ impl Project {
         let mut errors = Vec::new();
 
         // 验证包信息
-        if self.package.name.trim().is_empty() {
-            errors.push("项目名称不能为空".to_string());
-        }
-
-        if self.package.version.trim().is_empty() {
-            errors.push("项目版本不能为空".to_string());
-        }
-
-        // 验证Scala版本格式
-        if !self.package.scala_version.starts_with("2.") && !self.package.scala_version.starts_with("3.") {
-            errors.push("Scala版本格式无效，应为 2.x 或 3.x".to_string());
+        if let Err(pkg_errors) = self.package.validate() {
+            errors.extend(pkg_errors);
         }
 
         // 验证目录路径
-        if self.package.source_dir.trim().is_empty() {
-            errors.push("源代码目录不能为空".to_string());
-        }
-
-        if self.package.target_dir.trim().is_empty() {
-            errors.push("目标目录不能为空".to_string());
-        }
-
-        // 验证后端
-        let valid_backends = ["scala-cli", "sbt", "gradle", "maven"];
-        if !valid_backends.contains(&self.package.backend.as_str()) {
-            errors.push(format!("不支持的后端: {}，支持的后端: {}", self.package.backend, valid_backends.join(", ")));
+        let source_dir = self.get_source_directory();
+        if let Err(dir_errors) = source_dir.validate() {
+            errors.extend(dir_errors.into_iter().map(|e| format!("源代码目录错误: {}", e)));
         }
 
         // 验证依赖
@@ -206,24 +228,100 @@ impl Project {
             Err(errors)
         }
     }
+
+    /// 转换为DTO
+    pub fn to_dto(&self) -> ProjectDto {
+        ProjectDto {
+            package: self.package.to_dto(),
+            dependencies: self.dependencies.iter()
+                .map(|(k, v)| (k.clone(), v.to_dto()))
+                .collect(),
+            workspace: self.workspace.as_ref().map(|ws| ws.to_dto()),
+        }
+    }
 }
 
-/// 包信息
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Package {
-    pub name: String,
-    pub version: String,
-    pub main: Option<String>,
-    #[serde(default = "default_scala_version")]
-    pub scala_version: String,
-    #[serde(default = "default_source_dir")]
-    pub source_dir: String,
-    #[serde(default = "default_target_dir")]
-    pub target_dir: String,
-    #[serde(default = "default_test_dir")]
-    pub test_dir: String,
-    #[serde(default = "default_backend")]
-    pub backend: String,
+impl Package {
+    /// 验证包信息
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.name.trim().is_empty() {
+            errors.push("项目名称不能为空".to_string());
+        }
+
+        if self.version.trim().is_empty() {
+            errors.push("项目版本不能为空".to_string());
+        }
+
+        // 验证Scala版本格式
+        if !self.scala_version.starts_with("2.") && !self.scala_version.starts_with("3.") {
+            errors.push("Scala版本格式无效，应为 2.x 或 3.x".to_string());
+        }
+
+        // 验证目录路径
+        if self.source_dir.trim().is_empty() {
+            errors.push("源代码目录不能为空".to_string());
+        }
+
+        if self.target_dir.trim().is_empty() {
+            errors.push("目标目录不能为空".to_string());
+        }
+
+        // 验证后端
+        let valid_backends = ["scala-cli", "sbt", "gradle", "maven"];
+        if !valid_backends.contains(&self.backend.as_str()) {
+            errors.push(format!("不支持的后端: {}，支持的后端: {}", self.backend, valid_backends.join(", ")));
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// 转换为DTO
+    pub fn to_dto(&self) -> PackageDto {
+        PackageDto {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            main: self.main.clone(),
+            scala_version: self.scala_version.clone(),
+            source_dir: self.source_dir.clone(),
+            target_dir: self.target_dir.clone(),
+            test_dir: self.test_dir.clone(),
+            backend: self.backend.clone(),
+        }
+    }
+}
+
+impl From<ProjectDto> for Project {
+    fn from(dto: ProjectDto) -> Self {
+        Self {
+            root_path: PathBuf::new(), // 需要外部设置
+            package: dto.package.into(),
+            dependencies: dto.dependencies.into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
+            workspace: dto.workspace.map(|ws| ws.into()),
+        }
+    }
+}
+
+impl From<PackageDto> for Package {
+    fn from(dto: PackageDto) -> Self {
+        Self {
+            name: dto.name,
+            version: dto.version,
+            main: dto.main,
+            scala_version: dto.scala_version,
+            source_dir: dto.source_dir,
+            target_dir: dto.target_dir,
+            test_dir: dto.test_dir,
+            backend: dto.backend,
+        }
+    }
 }
 
 fn default_scala_version() -> String {

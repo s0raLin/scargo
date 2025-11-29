@@ -1,8 +1,17 @@
 use crate::deps::deps::Dependency;
-use tokio::fs;
 use std::path::Path;
+use tokio::fs;
 
-pub async fn build_with_deps(proj_dir: &Path, deps: &[Dependency], source_dir: &str, target_dir: &str, backend: &str, workspace_root: Option<&Path>, setup_bsp_flag: bool, is_workspace_build: bool) -> anyhow::Result<()> {
+pub async fn build_with_deps(
+    proj_dir: &Path,
+    deps: &[Dependency],
+    source_dir: &str,
+    target_dir: &str,
+    backend: &str,
+    workspace_root: Option<&Path>,
+    setup_bsp_flag: bool,
+    is_workspace_build: bool,
+) -> anyhow::Result<()> {
     let source_path = proj_dir.join(source_dir);
     let target_path = if let Some(ws_root) = workspace_root {
         ws_root.join(target_dir)

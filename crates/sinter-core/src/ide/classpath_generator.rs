@@ -1,6 +1,6 @@
 //! Classpath生成器
 
-use crate::domain::Project;
+use crate::models::Project;
 use crate::deps::Dependency;
 
 /// Classpath生成器

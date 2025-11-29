@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use config::Config;
 
-use crate::domain::*;
+use crate::models::*;
 
 /// 加载项目配置
 pub fn load_project(dir: &Path) -> anyhow::Result<Project> {
@@ -15,8 +15,9 @@ pub fn load_project(dir: &Path) -> anyhow::Result<Project> {
         .add_source(config::File::from(manifest_path))
         .build()
         .context("Failed to load project configuration")?;
-    let mut proj: Project = settings.try_deserialize()
+    let proj_dto: ProjectDto = settings.try_deserialize()
         .context("Failed to parse project configuration")?;
+    let mut proj: Project = proj_dto.into();
 
     // 设置项目根路径，映射到实际目录
     proj.root_path = dir.canonicalize()
@@ -46,7 +47,8 @@ pub fn find_workspace_root(start_dir: &Path) -> Option<PathBuf> {
                 .add_source(config::File::from(manifest.clone()))
                 .build()
             {
-                if let Ok(project) = settings.try_deserialize::<Project>() {
+                if let Ok(project_dto) = settings.try_deserialize::<ProjectDto>() {
+                    let project: Project = project_dto.into();
                     if project.workspace.is_some() {
                         return Some(current.to_path_buf());
                     }
@@ -74,8 +76,9 @@ pub fn load_workspace(dir: &Path) -> anyhow::Result<Option<(Project, Vec<Project
         .build()
         .context("Failed to load workspace configuration")?;
 
-    let mut root_project: Project = settings.try_deserialize()
+    let root_project_dto: ProjectDto = settings.try_deserialize()
         .context("Failed to parse workspace configuration")?;
+    let mut root_project: Project = root_project_dto.into();
 
     // 设置项目根路径
     root_project.root_path = dir.canonicalize()

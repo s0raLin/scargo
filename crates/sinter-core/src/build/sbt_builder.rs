@@ -1,6 +1,6 @@
 //! SBT构建器
 
-use crate::domain::Project;
+use crate::models::Project;
 use super::backend::BuildBackend;
 
 pub struct SbtBuilder;

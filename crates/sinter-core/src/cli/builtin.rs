@@ -2,21 +2,41 @@
 //!
 //! 包含所有内置命令的执行逻辑
 
-use crate::cli::{Commands, commands::{cmd_new, cmd_init, cmd_test, cmd_workspace}};
+use crate::cli::{Commands, commands::{cmd_test, cmd_workspace}};
 use crate::build::{run_scala_file, run_single_file_with_deps};
 use crate::ide::setup_bsp;
 use crate::deps::add_dependency;
 use crate::toolkit::path::PathManager;
 use crate::config::loader;
+use crate::routes::Router;
+use crate::controllers::project::ProjectController;
+use crate::di::{init_global_container, get_global_context, DefaultServiceProvider};
+use crate::error::Result;
+
+/// 获取路由分发器
+fn get_router() -> Result<Router> {
+    // 初始化全局DI容器
+    let provider = DefaultServiceProvider::new();
+    init_global_container(&provider)
+        .map_err(|e| crate::error::utils::from_anyhow(anyhow::anyhow!(e)))?;
+
+    // 获取DI上下文
+    let di_context = get_global_context()
+        .map_err(|e| crate::error::utils::from_anyhow(anyhow::anyhow!(e)))?;
+
+    Ok(Router::new()
+        .register("new", ProjectController::new(di_context.clone()))
+        .register("init", ProjectController::new(di_context)))
+}
 
 /// 执行内置命令
-pub async fn execute_command(command: Commands, cwd: &PathManager) -> anyhow::Result<()> {
+pub async fn execute_command(command: Commands, cwd: &PathManager) -> Result<()> {
+    let router = get_router()?;
+
     match command {
-        Commands::New { name } => {
-            cmd_new(cwd, &name).await?;
-        }
-        Commands::Init => {
-            cmd_init(cwd).await?;
+        Commands::New { .. } | Commands::Init => {
+            // 使用路由分发器处理项目相关命令
+            router.dispatch(command, cwd.clone()).await?;
         }
         Commands::Workspace { subcommand } => {
             cmd_workspace(cwd, &subcommand).await?;
@@ -35,20 +55,25 @@ pub async fn execute_command(command: Commands, cwd: &PathManager) -> anyhow::Re
         }
         Commands::Jsp { name } => {
             // JSP 命令应该由插件系统处理
-            anyhow::bail!("JSP command '{}' requires the JSP plugin to be loaded", name);
+            return Err(crate::error::utils::single_validation_error(
+                format!("JSP command '{}' requires the JSP plugin to be loaded", name)
+            ));
         }
     }
     Ok(())
 }
 
 /// 执行默认行为（无命令时）
-pub async fn execute_default(cwd: &PathManager) -> anyhow::Result<()> {
+pub async fn execute_default(cwd: &PathManager) -> Result<()> {
     if cwd.join("project.toml").exists_sync() {
-        let project = loader::load_project(cwd)?;
+
+        let project = loader::load_project(cwd)
+            .map_err(crate::error::utils::from_anyhow)?;
         let target = project.get_main_file_path();
         if cwd.join(&target).exists_sync() {
             let deps = crate::dependency::get_dependencies(&project);
-            let output = run_single_file_with_deps(cwd, &target, &deps).await?;
+            let output = run_single_file_with_deps(cwd, &target, &deps).await
+                .map_err(crate::error::utils::from_anyhow)?;
             println!("{}", output);
         } else {
             println!(
@@ -63,7 +88,7 @@ pub async fn execute_default(cwd: &PathManager) -> anyhow::Result<()> {
 }
 
 /// 执行构建命令
-async fn execute_build(cwd: &PathManager) -> anyhow::Result<()> {
+async fn execute_build(cwd: &PathManager) -> Result<()> {
     if let Ok(project) = loader::load_project(cwd) {
         if project.workspace.is_some() {
             // Workspace build - build all members
@@ -129,7 +154,9 @@ async fn execute_build(cwd: &PathManager) -> anyhow::Result<()> {
                             crate::i18n::tf("build_succeeded_with_deps", &[&transitive_deps.len().to_string()])
                         );
                     } else {
-                        anyhow::bail!("Member {} not found in workspace", member_name);
+                        return Err(crate::error::utils::single_validation_error(
+                            format!("Member {} not found in workspace", member_name)
+                        ));
                     }
                 } else {
                     // Not in a workspace, treat as single project
@@ -171,7 +198,9 @@ async fn execute_build(cwd: &PathManager) -> anyhow::Result<()> {
             }
         }
     } else {
-        anyhow::bail!("No project.toml found in {}", cwd.display());
+        return Err(crate::error::utils::single_validation_error(
+            format!("No project.toml found in {}", cwd.display())
+        ));
     }
     Ok(())
 }

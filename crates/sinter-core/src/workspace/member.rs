@@ -1,6 +1,6 @@
 //! 成员管理
 
-use crate::domain::Project;
+use crate::models::Project;
 
 /// 工作空间成员管理器
 pub struct MemberManager;

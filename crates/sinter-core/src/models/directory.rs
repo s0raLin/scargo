@@ -98,6 +98,23 @@ impl Directory {
         Ok(size)
     }
 
+    /// 验证目录状态
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if !self.exists {
+            errors.push(format!("目录不存在: {}", self.path.display()));
+        } else if !self.path.is_dir() {
+            errors.push(format!("路径不是目录: {}", self.path.display()));
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     fn calculate_size_recursive(&self, size: &mut u64) -> std::io::Result<()> {
         for entry in fs::read_dir(&self.path)? {
             let entry = entry?;

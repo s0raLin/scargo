@@ -1,6 +1,6 @@
 //! Scala CLI依赖解析器
 
-use crate::domain::Project;
+use crate::models::Project;
 use crate::deps::Dependency;
 use super::resolver::DependencyResolver;
 

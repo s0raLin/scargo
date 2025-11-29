@@ -1,6 +1,6 @@
-//! 自定义错误类型
+//! 错误处理模块
 //!
-//! 提供结构化的错误处理，替代anyhow的字符串错误
+//! 提供统一的错误类型和处理机制，支持结构化的错误信息和错误转换
 
 use std::fmt;
 
@@ -19,6 +19,10 @@ pub enum SinterError {
     Io(std::io::Error),
     /// TOML解析错误
     Toml(toml::de::Error),
+    /// 服务相关错误
+    Service(ServiceError),
+    /// 依赖注入错误
+    DI(DIError),
 }
 
 #[derive(Debug)]
@@ -42,6 +46,21 @@ pub enum DependencyError {
     NotFound(String),
 }
 
+#[derive(Debug)]
+pub enum ServiceError {
+    NotFound(String),
+    RegistrationFailed(String),
+    ResolutionFailed(String),
+}
+
+#[derive(Debug)]
+pub enum DIError {
+    ServiceNotRegistered(String),
+    TypeMismatch(String),
+    ContainerNotInitialized,
+    RegistrationFailed(String),
+}
+
 impl fmt::Display for SinterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -53,6 +72,8 @@ impl fmt::Display for SinterError {
             SinterError::Dependency(e) => write!(f, "依赖错误: {}", e),
             SinterError::Io(e) => write!(f, "IO错误: {}", e),
             SinterError::Toml(e) => write!(f, "TOML解析错误: {}", e),
+            SinterError::Service(e) => write!(f, "服务错误: {}", e),
+            SinterError::DI(e) => write!(f, "依赖注入错误: {}", e),
         }
     }
 }
@@ -103,10 +124,35 @@ impl fmt::Display for DependencyError {
     }
 }
 
+impl fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ServiceError::NotFound(name) => write!(f, "服务未找到: {}", name),
+            ServiceError::RegistrationFailed(msg) => write!(f, "服务注册失败: {}", msg),
+            ServiceError::ResolutionFailed(msg) => write!(f, "服务解析失败: {}", msg),
+        }
+    }
+}
+
+impl fmt::Display for DIError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DIError::ServiceNotRegistered(type_name) => {
+                write!(f, "服务未注册: {}", type_name)
+            }
+            DIError::TypeMismatch(msg) => write!(f, "类型不匹配: {}", msg),
+            DIError::ContainerNotInitialized => write!(f, "服务容器未初始化"),
+            DIError::RegistrationFailed(msg) => write!(f, "服务注册失败: {}", msg),
+        }
+    }
+}
+
 impl std::error::Error for SinterError {}
 impl std::error::Error for ConfigError {}
 impl std::error::Error for BuildError {}
 impl std::error::Error for DependencyError {}
+impl std::error::Error for ServiceError {}
+impl std::error::Error for DIError {}
 
 impl From<std::io::Error> for SinterError {
     fn from(err: std::io::Error) -> Self {
@@ -120,5 +166,52 @@ impl From<toml::de::Error> for SinterError {
     }
 }
 
+impl From<ServiceError> for SinterError {
+    fn from(err: ServiceError) -> Self {
+        SinterError::Service(err)
+    }
+}
+
+impl From<DIError> for SinterError {
+    fn from(err: DIError) -> Self {
+        SinterError::DI(err)
+    }
+}
+
+impl From<anyhow::Error> for SinterError {
+    fn from(err: anyhow::Error) -> Self {
+        utils::from_anyhow(err)
+    }
+}
+
+impl From<String> for DIError {
+    fn from(msg: String) -> Self {
+        DIError::RegistrationFailed(msg)
+    }
+}
+
 /// 结果类型别名
 pub type Result<T> = std::result::Result<T, SinterError>;
+
+/// 错误处理工具
+pub mod utils {
+    use super::{Result, SinterError};
+
+    /// 将anyhow错误转换为SinterError
+    pub fn from_anyhow(err: anyhow::Error) -> SinterError {
+        SinterError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            err.to_string(),
+        ))
+    }
+
+    /// 将字符串转换为验证错误
+    pub fn validation_error(messages: Vec<String>) -> SinterError {
+        SinterError::Validation(messages)
+    }
+
+    /// 创建单个验证错误
+    pub fn single_validation_error(message: String) -> SinterError {
+        SinterError::Validation(vec![message])
+    }
+}
